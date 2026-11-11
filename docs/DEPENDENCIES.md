@@ -8,7 +8,11 @@ Every third-party component, with its version, licence and reason. A new depende
 |---|---|---|---|---|
 | [Dear ImGui](https://github.com/ocornut/imgui) | 1.93.0, docking branch | MIT | The UI; docking for the later panel layout | FetchContent, built as `zs_imgui` (+ `zs_imgui_metal`) |
 | [GLFW](https://www.glfw.org) | 3.5.1 | zlib | Window, input and monitors on every platform | FetchContent |
-| [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | MIT | Design tokens; later settings, the satellite catalog and presets | FetchContent (header-only) |
+| [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | MIT | Design tokens, IQ sidecar files; later settings, the satellite catalog and presets | FetchContent (header-only) |
+| [ImPlot](https://github.com/epezent/implot) | 1.1 | MIT | The spectrum plot and its frequency axis | FetchContent, built as `zs_implot` |
+| [KissFFT](https://github.com/mborgerding/kissfft) | 131.1.0 | BSD-3-Clause | FFT behind `dsp::FftEngine` (vDSP may follow in v2) | FetchContent, `kiss_fft.c` only, as `zs_kissfft` |
+| [librtlsdr, RTL-SDR Blog fork](https://github.com/rtlsdrblog/rtl-sdr-blog) | V1.4.0 (2026-08) | GPL-2.0-or-later | Access to the RTL-SDR stick; this release recognises the Blog V4 (R828D) and V4 Lite (R828S) | FetchContent, the library and tuner sources built as static `zs_rtlsdr` (no pkg-config needed) |
+| [libusb](https://libusb.info) | 1.0.30 (Homebrew) | LGPL-2.1-or-later | USB access for librtlsdr | `brew install libusb`; the static `libusb-1.0.a` is linked, with IOKit, CoreFoundation and Security |
 
 ## Tests only
 
@@ -29,4 +33,4 @@ Cocoa, Foundation, Metal and QuartzCore are part of macOS and are linked from `s
 
 ## Planned
 
-These come from the plan and are added (with their rows above) in the milestone that needs them: librtlsdr from the RTL-SDR Blog fork, libusb, ImPlot, KissFFT, miniaudio, an SGP4 implementation, libcurl, SQLite. SatDump is an external program the user installs; it is not linked.
+These come from the plan and are added (with their rows above) in the milestone that needs them: miniaudio, an SGP4 implementation, libcurl, SQLite. SatDump is an external program the user installs; it is not linked.

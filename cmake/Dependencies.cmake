@@ -49,7 +49,30 @@ FetchContent_Declare(imgui
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_SUBDIR "no-cmake-here")
 
-FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui)
+# --- ImPlot 1.1 (MIT) — spectrum plot and its frequency axis ----------------
+FetchContent_Declare(implot
+    URL https://github.com/epezent/implot/archive/refs/tags/v1.1.tar.gz
+    URL_HASH SHA256=f13e1e111db2df1687e1568644429c2184eb5115867dc76bb0a8bd17a2e72ae8
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR "no-cmake-here")
+
+# --- KissFFT 131.1.0 (BSD-3-Clause) — FFT, behind dsp::FftEngine -------------
+FetchContent_Declare(kissfft
+    URL https://github.com/mborgerding/kissfft/archive/refs/tags/131.1.0.tar.gz
+    URL_HASH SHA256=76c1aac87ddb7258f34b08a13f0eebf9e53afa299857568346aa5c82bcafaf1a
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR "no-cmake-here")
+
+# --- librtlsdr, RTL-SDR Blog fork V1.4.0 (GPL-2.0-or-later) — the receiver ---
+# V1.4.0 (2026-08) recognises the Blog V4 (R828D) and the Blog V4 Lite (R828S).
+# Built here as a static library from its sources, so it needs no pkg-config.
+FetchContent_Declare(rtlsdr
+    URL https://github.com/rtlsdrblog/rtl-sdr-blog/archive/refs/tags/V1.4.0.tar.gz
+    URL_HASH SHA256=89520433e63b1a1371b45d8deea198cad9dbd1f0d55cc3a706aafb7b187bd325
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR "no-cmake-here")
+
+FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui implot kissfft rtlsdr)
 
 # zs_imgui: the ImGui core plus the GLFW platform backend. Both are portable C++.
 add_library(zs_imgui STATIC
@@ -73,3 +96,49 @@ if(APPLE)
     target_link_libraries(zs_imgui_metal PUBLIC zs_imgui
         "-framework Metal" "-framework QuartzCore")
 endif()
+
+# zs_implot: ImPlot on top of zs_imgui.
+add_library(zs_implot STATIC
+    ${implot_SOURCE_DIR}/implot.cpp
+    ${implot_SOURCE_DIR}/implot_items.cpp)
+target_include_directories(zs_implot SYSTEM PUBLIC ${implot_SOURCE_DIR})
+target_link_libraries(zs_implot PUBLIC zs_imgui)
+
+# zs_kissfft: the complex FFT only (single precision, the default scalar).
+add_library(zs_kissfft STATIC ${kissfft_SOURCE_DIR}/kiss_fft.c)
+target_include_directories(zs_kissfft SYSTEM PUBLIC ${kissfft_SOURCE_DIR})
+
+# --- libusb (LGPL-2.1-or-later), from Homebrew: `brew install libusb` ---------
+# Linked statically so the app bundle carries it (M7). Its static form needs
+# the frameworks below (from libusb-1.0.pc, Libs.private).
+find_path(ZS_LIBUSB_INCLUDE_DIR libusb.h
+    PATH_SUFFIXES libusb-1.0
+    HINTS /opt/homebrew/opt/libusb/include /usr/local/opt/libusb/include)
+find_library(ZS_LIBUSB_STATIC NAMES libusb-1.0.a
+    HINTS /opt/homebrew/opt/libusb/lib /usr/local/opt/libusb/lib)
+if(NOT ZS_LIBUSB_INCLUDE_DIR OR NOT ZS_LIBUSB_STATIC)
+    message(FATAL_ERROR "libusb not found. Install it with: brew install libusb")
+endif()
+add_library(zs_libusb INTERFACE)
+target_include_directories(zs_libusb SYSTEM INTERFACE ${ZS_LIBUSB_INCLUDE_DIR})
+target_link_libraries(zs_libusb INTERFACE ${ZS_LIBUSB_STATIC})
+if(APPLE)
+    target_link_libraries(zs_libusb INTERFACE
+        objc "-framework IOKit" "-framework CoreFoundation" "-framework Security")
+endif()
+
+# zs_rtlsdr: librtlsdr with its tuner drivers, static (rtlsdr_STATIC empties
+# the export macro).
+find_package(Threads REQUIRED)
+add_library(zs_rtlsdr STATIC
+    ${rtlsdr_SOURCE_DIR}/src/librtlsdr.c
+    ${rtlsdr_SOURCE_DIR}/src/tuner_e4k.c
+    ${rtlsdr_SOURCE_DIR}/src/tuner_fc0012.c
+    ${rtlsdr_SOURCE_DIR}/src/tuner_fc0013.c
+    ${rtlsdr_SOURCE_DIR}/src/tuner_fc2580.c
+    ${rtlsdr_SOURCE_DIR}/src/tuner_r82xx.c)
+target_include_directories(zs_rtlsdr SYSTEM PUBLIC ${rtlsdr_SOURCE_DIR}/include)
+target_compile_definitions(zs_rtlsdr PUBLIC rtlsdr_STATIC)
+# Upstream C code: keep its warnings out of our build log.
+target_compile_options(zs_rtlsdr PRIVATE -w)
+target_link_libraries(zs_rtlsdr PUBLIC zs_libusb Threads::Threads)
