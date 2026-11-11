@@ -35,6 +35,23 @@ TEST_CASE("strings: Romanian uses comma-below Ș ș Ț ț, never the cedilla for
     }
 }
 
+TEST_CASE("strings: both languages have the same {} placeholders") {
+    auto count = [](std::string_view text) {
+        size_t n = 0;
+        for (size_t pos = text.find("{}"); pos != std::string_view::npos;
+             pos = text.find("{}", pos + 2)) {
+            ++n;
+        }
+        return n;
+    };
+    for (size_t i = 0; i < zarescope::ui::kStringCount; ++i) {
+        const auto id = static_cast<StringId>(i);
+        CAPTURE(text(id, Language::English));
+        CHECK(count(text(id, Language::English)) == count(text(id, Language::Romanian)));
+    }
+    CHECK(textf(StringId::StatusDropped, Language::Romanian, 3) == "3 blocuri pierdute");
+}
+
 TEST_CASE("clock: UTC is formatted HH:MM:SS, 24-hour") {
     using namespace std::chrono;
     // 2026-11-11 21:07:05.750 UTC

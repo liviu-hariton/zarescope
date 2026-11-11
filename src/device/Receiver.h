@@ -144,6 +144,10 @@ private:
     std::thread m_dsp;
     std::atomic<bool> m_dspRunning{false};
 
+    // Coalesced tuning (see setCenterFrequency).
+    std::atomic<int64_t> m_pendingFrequencyHz{0};
+    std::atomic<bool> m_tunePending{false};
+
     // DSP settings, read by the DSP thread.
     std::atomic<size_t> m_fftSize{kDefaultFftSize};
     std::atomic<float> m_traceWeight{0.4F};

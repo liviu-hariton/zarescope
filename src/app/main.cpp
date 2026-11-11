@@ -5,6 +5,7 @@
 // Command line (all optional; Finder passes none):
 //   --theme dark|light   start in this theme
 //                        (open build/Zarescope.app --args --theme light)
+//   --open FILE.cu8      play this recording at start-up
 
 #include "app/App.h"
 
@@ -29,6 +30,8 @@ bool parseArguments(int argc, char** argv, zarescope::app::Options& options) {
                              static_cast<int>(value.size()), value.data());
                 return false;
             }
+        } else if (arg == "--open" && i + 1 < argc) {
+            options.recording = std::filesystem::path(argv[++i]);
         } else if (arg.starts_with("-psn_")) {
             // Older macOS versions pass a process serial number; ignore it.
         } else {

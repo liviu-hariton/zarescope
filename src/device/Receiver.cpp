@@ -105,6 +105,7 @@ template <typename Control>
 void Receiver::deviceControl(Control&& control) {
     post([this, control = std::forward<Control>(control)] {
         if (m_device == nullptr) {
+            m_tunePending.store(false);
             return;  // files can't be tuned; the UI disables these controls
         }
         std::string error;
@@ -120,8 +121,16 @@ void Receiver::deviceControl(Control&& control) {
 }
 
 void Receiver::setCenterFrequency(int64_t frequencyHz) {
-    deviceControl([frequencyHz](RtlSdrSource& device, std::string& error) {
-        return device.setCenterFrequency(frequencyHz, error);
+    // Scrolling over the frequency display can ask for dozens of retunes a
+    // second, each a USB transaction. Keep only the newest target and post
+    // one command while none is pending: latest wins, nothing piles up.
+    m_pendingFrequencyHz.store(frequencyHz);
+    if (m_tunePending.exchange(true)) {
+        return;
+    }
+    deviceControl([this](RtlSdrSource& device, std::string& error) {
+        m_tunePending.store(false);
+        return device.setCenterFrequency(m_pendingFrequencyHz.load(), error);
     });
 }
 

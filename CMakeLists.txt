@@ -69,3 +69,6 @@ if(ZARESCOPE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# Developer tools (not part of the app bundle).
+add_subdirectory(tools)

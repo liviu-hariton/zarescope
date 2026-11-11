@@ -4,19 +4,23 @@
 
 #include "app/App.h"
 
+#include "device/Receiver.h"
 #include "platform/AppPaths.h"
+#include "platform/FileDialog.h"
 #include "platform/Renderer.h"
 #include "platform/WindowAppearance.h"
 #include "ui/MainWindow.h"
 #include "ui/Typography.h"
 #include "ui/theme/DesignTokens.h"
 #include "ui/theme/ImGuiTheme.h"
+#include "ui/theme/PlotTheme.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
+#include <implot.h>
 
 #include <array>
 #include <chrono>
@@ -73,6 +77,11 @@ platform::Appearance appearanceFor(theme::ThemeVariant variant) {
                                                 : platform::Appearance::Light;
 }
 
+// Applies one theme variant to everything drawn: ImGui, ImPlot and the
+// native window chrome.
+void applyThemeEverywhere(const theme::DesignTokens& tokens, theme::ThemeVariant variant,
+                          GLFWwindow* window);
+
 void reportTheme(const ui::ThemeReport& report) {
     for (const auto& name : report.unknownStyleFields) {
         std::fprintf(stderr, "theme: imgui.style.%s is not an ImGuiStyle field\n", name.c_str());
@@ -85,6 +94,15 @@ void reportTheme(const ui::ThemeReport& report) {
     }
 }
 
+void applyThemeEverywhere(const theme::DesignTokens& tokens, theme::ThemeVariant variant,
+                          GLFWwindow* window) {
+    reportTheme(ui::applyTheme(tokens, variant, ImGui::GetStyle()));
+    for (const auto& name : ui::applyPlotTheme(tokens, variant, ImPlot::GetStyle())) {
+        std::fprintf(stderr, "theme: ImPlotCol_%s has no colour token\n", name.c_str());
+    }
+    platform::setWindowAppearance(window, appearanceFor(variant));
+}
+
 }  // namespace
 
 // Everything the app owns. Its destructor tears down whatever start-up got
@@ -94,7 +112,11 @@ struct App::State {
     std::unique_ptr<platform::Renderer> renderer;
     bool glfwStarted = false;
     bool imguiContext = false;
+    bool implotContext = false;
     bool glfwBackend = false;
+    // The receive chain. Declared before the window so the window, which
+    // refers to it, goes first.
+    std::unique_ptr<device::Receiver> receiver;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -107,8 +129,17 @@ struct App::State {
     State& operator=(State&&) = delete;
 
     ~State() {
+        // Stop the receive threads first: nothing else may be drawing.
+        if (receiver) {
+            receiver.reset();
+        }
         if (renderer) {
-            renderer->shutdown();
+            renderer->shutdown();  // releases GPU textures, including the waterfall's
+        }
+        // The window's views unregister their textures: needs the context.
+        mainWindow.reset();
+        if (implotContext) {
+            ImPlot::DestroyContext();
         }
         if (glfwBackend) {
             ImGui_ImplGlfw_Shutdown();
@@ -146,6 +177,8 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     s.imguiContext = true;
+    ImPlot::CreateContext();
+    s.implotContext = true;
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -164,10 +197,19 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     s.typography.emplace(*fonts, *s.tokens);
 
     s.shell.variant = options.variant.value_or(s.tokens->defaultVariant());
-    reportTheme(ui::applyTheme(*s.tokens, s.shell.variant, ImGui::GetStyle()));
-    platform::setWindowAppearance(s.window, appearanceFor(s.shell.variant));
+    applyThemeEverywhere(*s.tokens, s.shell.variant, s.window);
 
-    s.mainWindow.emplace(*s.tokens, *s.typography, ZARESCOPE_VERSION);
+    s.receiver = std::make_unique<device::Receiver>();
+    const std::filesystem::path recordings = paths.userData / "recordings";
+    ui::MainWindowServices services;
+    services.receiver = s.receiver.get();
+    services.recordingsFolder = recordings;
+    services.chooseRecording = [recordings] { return platform::chooseRecordingToOpen(recordings); };
+    services.versionText = ZARESCOPE_VERSION;
+    s.mainWindow.emplace(*s.tokens, *s.typography, std::move(services));
+    if (options.recording) {
+        s.receiver->openFile(*options.recording);
+    }
 
     // Install GLFW callbacks (true): ImGui gets mouse, keyboard and focus.
     if (!ImGui_ImplGlfw_InitForOther(s.window, true)) {
@@ -187,8 +229,10 @@ int App::run() {
     auto lastActive = Clock::now();
 
     while (glfwWindowShouldClose(s.window) == GLFW_FALSE) {
+        // Live data and recordings change by themselves: draw at the
+        // display's rate. Otherwise sleep until input (or the clock tick).
         const bool recentlyActive = Clock::now() - lastActive < kActiveFor;
-        if (recentlyActive) {
+        if (recentlyActive || s.mainWindow->wantsContinuousFrames()) {
             glfwPollEvents();  // the display's refresh paces the loop
         } else {
             glfwWaitEventsTimeout(kIdleWakeSeconds);
@@ -207,8 +251,7 @@ int App::run() {
 
         // The theme switch was used: swap the whole token set.
         if (s.shell.variant != shownVariant) {
-            reportTheme(ui::applyTheme(*s.tokens, s.shell.variant, ImGui::GetStyle()));
-            platform::setWindowAppearance(s.window, appearanceFor(s.shell.variant));
+            applyThemeEverywhere(*s.tokens, s.shell.variant, s.window);
             lastActive = Clock::now();
         }
     }

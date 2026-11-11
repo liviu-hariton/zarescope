@@ -11,6 +11,7 @@
 
 #include "ui/theme/DesignTokens.h"
 
+#include <filesystem>
 #include <memory>
 #include <optional>
 
@@ -20,6 +21,8 @@ namespace zarescope::app {
 struct Options {
     // Start in this theme instead of the token file's default.
     std::optional<theme::ThemeVariant> variant;
+    // Open this .cu8 recording at start-up.
+    std::optional<std::filesystem::path> recording;
 };
 
 class App {

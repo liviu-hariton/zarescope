@@ -1,30 +1,36 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The main window's shell (design/docs/DESIGN.md §6), as far as M0 goes:
+// The main window (design/docs/DESIGN.md §6), as far as M1 goes:
 //
-//   ┌ top bar (64) ───────────────────────────────────────────────────────┐
-//   │ logo                                   [No receiver]  [Dark|Light]  │
-//   ├─────────────────────────────────────────────────────────────────────┤
-//   │                                                                     │
-//   │                 empty state: no receiver yet                        │
-//   │                                                                     │
-//   ├ status bar (28) ────────────────────────────────────────────────────┤
-//   │ Zarescope 0.1.0                          UTC 14:32:05  Local 16:32:05│
-//   └─────────────────────────────────────────────────────────────────────┘
+//   ┌ top bar (64) ────────────────────────────────────────────────────────┐
+//   │ logo  98.000 000 MHz  [Gain auto ⌄]    [RTL-SDR Blog V4] (LIVE) [● Record] [Dark|Light] │
+//   ├ banner (44): recording / an error, only when there is one ────────────┤
+//   │ Spectrum                                         FFT 4096 · 586 Hz/bin │
+//   │ spectrum (210)                                                         │
+//   │ waterfall                                                              │
+//   │ frequency axis                                                         │
+//   ├ status bar (28) ──────────────────────────────────────────────────────┤
+//   │ Zarescope 0.2.0  RTL-SDR Blog V4 · 2.4 MS/s       UTC 14:32:05  Local │
+//   └───────────────────────────────────────────────────────────────────────┘
 //
-// The frequency display, signal meter, tabs, spectrum, waterfall and side
-// panel arrive with the milestones that give them data (M1 onwards).
+// With no source open, the body shows the empty state with two actions:
+// connect a receiver, or open a recording.
+//
+// MainWindow never touches the device, the DSP or the disk itself: it
+// posts commands to the Receiver and draws what the Receiver produced.
 
 #pragma once
 
+#include "device/Receiver.h"
+#include "ui/FrequencyDisplay.h"
+#include "ui/SpectrumView.h"
 #include "ui/Strings.h"
-#include "ui/Typography.h"
-#include "ui/theme/DesignTokens.h"
+#include "ui/UiKit.h"
 
-#include <imgui.h>
-
+#include <filesystem>
+#include <functional>
+#include <optional>
 #include <string>
-#include <string_view>
 
 namespace zarescope::ui {
 
@@ -35,39 +41,66 @@ struct ShellState {
     Language language = Language::English;
 };
 
+// What the window needs from the app and the platform.
+struct MainWindowServices {
+    device::Receiver* receiver = nullptr;
+    std::filesystem::path recordingsFolder;
+    // Shows the system's "open file" dialog for a .cu8 recording.
+    std::function<std::optional<std::filesystem::path>()> chooseRecording;
+    std::string versionText;
+};
+
 class MainWindow {
 public:
+    // Needs a live ImGui context (the spectrum view registers a texture).
     MainWindow(const theme::DesignTokens& tokens, const Typography& typography,
-               std::string versionText);
+               MainWindowServices services);
 
     // Draws the whole window for one frame. Call between ImGui::NewFrame()
     // and ImGui::Render().
     void draw(ShellState& state);
 
+    // True while something on screen changes by itself (live data, a
+    // recording): the app then draws at the display's rate.
+    [[nodiscard]] bool wantsContinuousFrames() const;
+
 private:
-    // A colour token of the current theme, ready for ImDrawList.
-    [[nodiscard]] ImU32 color(std::string_view token) const;
-    [[nodiscard]] float sizeToken(std::string_view name) const;
-    [[nodiscard]] float spacingToken(std::string_view step) const;
-    [[nodiscard]] float radiusToken(std::string_view name) const;
-    [[nodiscard]] std::string_view tr(StringId id) const { return text(id, m_state->language); }
-
-    void drawTopBar();
+    void pullData();
+    void drawTopBar(ShellState& state);
+    float drawBanner(float top);
     void drawBody();
+    void drawEmptyState(ImVec2 origin, ImVec2 size);
+    void drawSpectrumArea(ImVec2 origin, ImVec2 size);
     void drawStatusBar();
+    void drawDevicePopup();
+    void drawGainPopup();
+    void drawFftPopup();
+    void openRecording();
+    void toggleRecording();
 
-    // A pill-shaped, read-only status chip. Returns its width.
-    float chip(ImVec2 pos, std::string_view label);
-    // A segmented control; returns true when the selection changed.
-    bool segmented(const char* id, ImVec2 pos, const std::string_view* labels, int count,
-                   int& selected);
-    [[nodiscard]] float segmentedWidth(const std::string_view* labels, int count) const;
-    [[nodiscard]] float chipWidth(std::string_view label) const;
+    UiKit m_ui;
+    MainWindowServices m_services;
+    FrequencyDisplay m_frequency;
+    SpectrumView m_spectrum;
 
-    const theme::DesignTokens& m_tokens;
-    const Typography& m_typography;
-    std::string m_versionText;
-    ShellState* m_state = nullptr;  // valid during draw() only
+    // This frame's view of the receiver.
+    device::ReceiverStatus m_status;
+    device::RecorderStatus m_recording;
+    device::SpectrumRow m_trace;
+
+    // Popups are opened from inside the bars but live at window level.
+    bool m_openDevices = false;
+    bool m_openGain = false;
+    bool m_openFft = false;
+    ImVec2 m_deviceAnchor;
+    ImVec2 m_gainAnchor;
+    ImVec2 m_fftAnchor;
+    bool m_confirmBiasTee = false;
+    float m_traceSmoothing = 0.4F;
+
+    // Banners the user dismissed, so they don't come back for the same event.
+    std::string m_dismissedError;
+    std::filesystem::path m_dismissedRecording;
 };
 
 }  // namespace zarescope::ui

@@ -5,6 +5,7 @@
 // ImGui runs headless here (a context, no window, no frame).
 
 #include "ui/theme/ImGuiTheme.h"
+#include "ui/theme/PlotTheme.h"
 
 #include <doctest/doctest.h>
 
@@ -81,4 +82,17 @@ TEST_CASE("theme: values land where the design says") {
     CHECK(same(light.Colors[ImGuiCol_NavCursor],
                toImVec4(*tokens.color(ThemeVariant::Light, "focus-ring"))));
     CHECK(light.FramePadding.x == doctest::Approx(10.0));
+}
+
+TEST_CASE("theme: every ImPlot colour maps, in both themes") {
+    const ImGuiContextScope context;
+    ImPlot::CreateContext();
+    const DesignTokens tokens = DesignTokens::fromFile(ZARESCOPE_TOKENS_FILE);
+    for (ThemeVariant variant : {ThemeVariant::Dark, ThemeVariant::Light}) {
+        ImPlotStyle style;
+        CHECK(zarescope::ui::applyPlotTheme(tokens, variant, style).empty());
+        CHECK(same(style.Colors[ImPlotCol_PlotBg], toImVec4(*tokens.color(variant, "bg/base"))));
+        CHECK(style.Colors[ImPlotCol_FrameBg].w == doctest::Approx(0.0));
+    }
+    ImPlot::DestroyContext();
 }

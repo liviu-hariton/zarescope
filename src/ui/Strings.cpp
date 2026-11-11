@@ -19,19 +19,88 @@ struct Entry {
 // One row per StringId, in enum order. The static_assert below fails the
 // build if a row is missing or out of place.
 constexpr std::array<Entry, kStringCount> kStrings{{
-    {StringId::EmptyTitle, "No receiver yet", "Niciun receptor încă"},
-    {StringId::EmptyBody,
-     "This build doesn't talk to RTL-SDR sticks yet. The live spectrum and waterfall will "
-     "appear here once receiver support is in.",
-     "Această versiune nu comunică încă cu stickurile RTL-SDR. Spectrul live și waterfall-ul "
-     "vor apărea aici după ce se adaugă suportul pentru receptor."},
+    // Empty state
+    {StringId::EmptyTitle, "Nothing to show yet", "Nimic de afișat încă"},
+    {StringId::EmptyBody, "Connect an RTL-SDR stick to see the live spectrum, or open a recording.",
+     "Conectează un stick RTL-SDR ca să vezi spectrul live sau deschide o înregistrare."},
+    {StringId::ConnectReceiver, "Connect receiver", "Conectează receptorul"},
+    {StringId::OpenRecording, "Open recording…", "Deschide o înregistrare…"},
+    // Top bar
     {StringId::ReceiverChipNone, "No receiver", "Niciun receptor"},
+    {StringId::ReceiverChipOpening, "Opening…", "Se deschide…"},
+    {StringId::ChipLive, "LIVE", "LIVE"},
+    {StringId::ChipReplay, "REPLAY", "REDARE"},
     {StringId::ThemeLabel, "Theme", "Temă"},
     {StringId::ThemeDark, "Dark", "Întunecată"},
     {StringId::ThemeLight, "Light", "Luminoasă"},
+    {StringId::GainLabel, "Gain", "Câștig"},
+    {StringId::GainAuto, "Auto", "Automat"},
+    {StringId::GainAutomaticTuner, "Automatic (the tuner decides)", "Automat (decide tunerul)"},
+    {StringId::Record, "Record", "Înregistrează"},
+    {StringId::StopRecording, "Stop recording", "Oprește înregistrarea"},
+    {StringId::FrequencyHelp,
+     "Scroll over a digit, or click it and use ↑ ↓, to change that digit. Type digits to enter a "
+     "frequency.",
+     "Derulează peste o cifră sau dă clic pe ea și folosește ↑ ↓ ca s-o schimbi. Tastează cifre "
+     "ca să introduci o frecvență."},
+    {StringId::FrequencyFixedHelp, "A recording stays on the frequency it was made on.",
+     "O înregistrare rămâne pe frecvența la care a fost făcută."},
+    // Device panel
+    {StringId::ReceiversTitle, "Receivers", "Receptoare"},
+    {StringId::Searching, "Looking for RTL-SDR sticks…", "Se caută stickuri RTL-SDR…"},
+    {StringId::NoReceiverFound, "No RTL-SDR stick found. Plug one in, then search again.",
+     "Niciun stick RTL-SDR găsit. Conectează unul, apoi caută din nou."},
+    {StringId::SearchAgain, "Search again", "Caută din nou"},
+    {StringId::Open, "Open", "Deschide"},
+    {StringId::SerialNumber, "Serial {}", "Serie {}"},
+    {StringId::CloseReceiver, "Close receiver", "Închide receptorul"},
+    {StringId::CloseRecording, "Close recording", "Închide înregistrarea"},
+    {StringId::TunerLabel, "Tuner", "Tuner"},
+    {StringId::IdentityConsistent, "The tuner matches the model the stick reports.",
+     "Tunerul corespunde modelului raportat de stick."},
+    {StringId::IdentityMismatch,
+     "The stick reports itself as an {}, but its tuner isn't the one that model uses. It may be "
+     "a counterfeit.",
+     "Stickul se declară {}, dar tunerul nu este cel folosit de acest model. Poate fi o "
+     "contrafacere."},
+    {StringId::IdentityUnverifiable, "A generic stick: it reports no model to check.",
+     "Stick generic: nu raportează un model de verificat."},
+    {StringId::SampleRateLabel, "Sample rate", "Rată de eșantionare"},
+    {StringId::PpmLabel, "Frequency correction (ppm)", "Corecție de frecvență (ppm)"},
+    {StringId::BiasTeeLabel, "Bias-tee (antenna power)", "Bias-tee (alimentarea antenei)"},
+    {StringId::BiasTeeWarning,
+     "The bias-tee sends 4.5 V up the antenna cable to power an LNA or an active antenna. With a "
+     "plain antenna, or one that shorts DC, it can damage the stick or the antenna.",
+     "Bias-tee trimite 4,5 V pe cablul antenei, ca să alimenteze un LNA sau o antenă activă. Cu o "
+     "antenă simplă sau una care scurtcircuitează curentul continuu poate strica stickul sau "
+     "antena."},
+    {StringId::BiasTeeTurnOn, "Turn on bias-tee", "Pornește bias-tee"},
+    {StringId::Cancel, "Cancel", "Renunță"},
+    {StringId::RecordingFromFile, "Recording · {} · {}", "Înregistrare · {} · {}"},
+    // Banners
+    {StringId::RecordingBanner, "Recording {} — {} · {}", "Înregistrare {} — {} · {}"},
+    {StringId::RecordingEndedRetune, "Recording ended because the frequency changed. Saved {}.",
+     "Înregistrarea s-a oprit pentru că s-a schimbat frecvența. Salvată: {}."},
+    {StringId::RecordingFailed, "Recording failed: {}", "Înregistrarea a eșuat: {}"},
+    {StringId::ReceiverFailed, "Couldn't open the receiver: {}",
+     "Receptorul nu a putut fi deschis: {}"},
+    {StringId::Dismiss, "Dismiss", "Închide"},
+    // Spectrum
+    {StringId::TabSpectrum, "Spectrum", "Spectru"},
+    {StringId::FftInfo, "FFT {} · {}/bin", "FFT {} · {}/bin"},
+    {StringId::FftSizeLabel, "FFT size", "Mărime FFT"},
+    {StringId::SmoothingLabel, "Spectrum smoothing", "Netezirea spectrului"},
+    {StringId::WaterfallFloorLabel, "Waterfall floor", "Pragul de jos al waterfall-ului"},
+    {StringId::WaterfallCeilingLabel, "Waterfall ceiling", "Pragul de sus al waterfall-ului"},
+    {StringId::FitToSignal, "Fit to signal", "Potrivește după semnal"},
+    {StringId::TuneHint, "Click to tune here", "Clic ca să acordezi aici"},
+    // Status bar
     {StringId::StatusVersion, "Zarescope", "Zarescope"},
     {StringId::StatusUtc, "UTC", "UTC"},
     {StringId::StatusLocal, "Local", "Local"},
+    {StringId::StatusNoReceiver, "No receiver", "Niciun receptor"},
+    {StringId::StatusReplaying, "Replaying", "Redare"},
+    {StringId::StatusDropped, "Dropped {} blocks", "{} blocuri pierdute"},
 }};
 
 constexpr bool rowsMatchIds() {
