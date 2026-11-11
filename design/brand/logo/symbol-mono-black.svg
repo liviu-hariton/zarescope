@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Zarescope"><title>Zarescope</title>
+<defs><mask id="ko" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"/><circle cx="34.84" cy="21.92" r="7" fill="#000"/></mask></defs>
+<g mask="url(#ko)" fill="none" stroke-linecap="round">
+<circle cx="32" cy="32" r="26" stroke="#0B0E1A" stroke-width="3.5"/>
+<circle cx="32" cy="32" r="13" stroke="#0B0E1A" stroke-width="2.5"/>
+<path d="M32 6V13" stroke="#0B0E1A" stroke-width="3.5"/>
+<path d="M10.5 46.6C16.2 34.24 24.96 25.7 34.84 21.92" stroke="#0B0E1A" stroke-width="3.5"/>
+<path d="M34.84 21.92C41.42 19.4 48.5 19 55.5 21" stroke="#0B0E1A" stroke-width="3.5" stroke-dasharray="0.1 6.4"/>
+</g>
+<circle cx="34.84" cy="21.92" r="5.5" fill="#0B0E1A"/></svg>

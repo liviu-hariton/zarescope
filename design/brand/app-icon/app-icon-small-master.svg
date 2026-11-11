@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Zarescope app icon"><title>Zarescope app icon</title>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#0E1320"/>
+<g transform="translate(190.6 190.6) scale(40.1700)"><defs><mask id="ko16" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16"><rect width="16" height="16" fill="#fff"/><circle cx="8.8" cy="5.46" r="2.9" fill="#000"/></mask></defs>
+<circle cx="8" cy="8" r="6.5" fill="#161C2C"/><g mask="url(#ko16)" fill="none" stroke-linecap="round">
+<circle cx="8" cy="8" r="6.5" stroke="#E8EBF4" stroke-width="1.5"/>
+<path d="M2.6 11.2C5 6.5 9.5 4 14.3 5.3" stroke="#FFB547" stroke-width="1.5"/>
+</g>
+<circle cx="8.8" cy="5.46" r="1.9" fill="#FFB547"/></g></svg>

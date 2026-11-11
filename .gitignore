@@ -1,0 +1,23 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+
+# IDE (CLion project files stay local)
+.idea/
+.vscode/
+*.user
+
+# macOS
+.DS_Store
+
+
+# Large IQ recordings never go into git (tests/data keeps only small files)
+*.cu8
+*.cs8
+*.cs16
+*.cf32
+!tests/data/**/*.cu8
+
+# Logs
+*.log
