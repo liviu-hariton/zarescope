@@ -176,3 +176,38 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Decision.** Tests that need a stick are named `[hardware] …` and built as `zarescope_hardware_tests`, which CTest doesn't run.
 - **Why.** `ctest` must pass on any machine without hardware, and a separate binary can't be run by accident.
 - **Rejected.** Excluding test cases by doctest filter in CTest: easy to get wrong silently.
+
+## 2026-11-11 — Listening: the VFO moves, the stick retunes only when it must
+
+- **Decision.**
+  - The frequency display, clicks and the scroll wheel move a VFO inside the captured span.
+  - The stick retunes only when the VFO leaves the span (minus a margin), and then lands an eighth of the span off centre.
+  - In a recording the VFO is clamped to the captured span.
+- **Why.**
+  - Retuning is a USB transaction and resets the waterfall; moving within the span is free.
+  - The RTL-SDR has a DC spike at the centre, so a station there would sit on it.
+  - Moving the VFO makes recordings listenable station by station.
+- **Rejected.** Always retuning so the VFO is at the centre (the SDR# "centre tuning" mode): the DC spike, and a waterfall that resets on every step.
+
+## 2026-11-11 — The audio chain decimates in stages and resamples last
+
+- **Decision.**
+  - **Channel rate.** Decimate by integer factors of at most 8 down to a channel rate (WFM ≥ 200 kHz, NFM and AM ≥ 24 kHz), with one windowed-sinc low-pass per stage.
+  - **Audio.** After demodulation, a low-pass at 15 kHz (WFM) or 4 kHz (voice), then Catmull-Rom resampling to the sound card's own rate.
+- **Why.**
+  - Short filters per stage cost about 2.5 % of a core for WFM at 2.4 MS/s, against roughly 6× more for one long filter.
+  - Resampling last adapts to any sound card rate (44.1, 48, 96 kHz) and any capture rate (2.048 MS/s isn't a multiple of 48 kHz).
+- **Rejected.**
+  - A polyphase rational resampler: more code for no audible gain at these bandwidths.
+  - Asking the sound card for 48 kHz: macOS would resample anyway.
+
+## 2026-11-11 — Sound through miniaudio, with latency bounded in the ring
+
+- **Decision.**
+  - Sound goes through miniaudio's default playback device (mono, float, native rate), fed by a lock-free ring.
+  - When more than 150 ms are waiting, the audio callback skips the oldest samples. When the ring runs dry, it plays silence.
+  - The device opens the first time a mode is chosen, on the control thread.
+- **Why.**
+  - The stick's clock and the sound card's never agree, so the fill drifts; skipping keeps the delay between waterfall and sound short.
+  - Opening lazily means the app never holds the sound device unless asked to.
+- **Rejected.** Adaptive resampling to track the clock drift: better, but more complex. It is worth revisiting if the skips become audible.

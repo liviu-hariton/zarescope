@@ -1,6 +1,6 @@
 # Zarescope architecture
 
-This describes what exists today (end of M1). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+This describes what exists today (end of M2). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
 
 ## Threads and data flow
 
@@ -17,6 +17,7 @@ This describes what exists today (end of M1). Each milestone adds its part here 
  ┌──────────── DSP thread (Receiver) ───────┐
  │ IqRecorder::offer ──▶ recorder queue ──▶ writer thread ──▶ .cu8 + .json
  │ SpectrumAnalyzer: window, FFT, average   │
+ │ AudioDemodulator ──▶ AudioRing ──▶ sound card callback (miniaudio thread)
  └───────┬──────────────────────┬───────────┘
          │ every row            │ smoothed trace (latest only)
          ▼ SpscSlots (64)       ▼ TripleBuffer
@@ -36,8 +37,9 @@ These rules hold:
 
 | Target | Holds | Depends on |
 |---|---|---|
-| `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, `SignalGenerator`, cu8 conversion | KissFFT |
-| `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Receiver` | `zarescope_dsp`, librtlsdr (static), libusb (static), nlohmann/json |
+| `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, the filters, `AudioDemodulator`, `SignalGenerator`, cu8 conversion | KissFFT |
+| `zarescope_audio` | `AudioOutput`, `AudioRing` | miniaudio |
+| `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Presets`, `Receiver` | `zarescope_dsp`, `zarescope_audio`, librtlsdr (static), libusb (static), nlohmann/json |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
 | `zarescope_ui` | the screens, the ImGui and ImPlot themes, fonts, strings, formats | `zarescope_theme`, `zarescope_device`, Dear ImGui, ImPlot |
 | `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
@@ -80,6 +82,26 @@ Dependencies point one way. Nothing outside `src/platform/macos` includes an App
   - A seq_cst handshake (`m_offersInFlight` against `m_recording`) guarantees the final drain sees every block.
 - **DeviceIdentity.** Compares the model claimed in the EEPROM's USB strings (`RTLSDRBlog` / `Blog V4`, `Blog V4L`, `Blog V3`, matched exactly as librtlsdr does) with the tuner read over I²C. A V4 must report an R828D; anything else is flagged as a mismatch, the usual sign of a counterfeit.
 
+## Listening (`src/dsp/AudioDemodulator`, `src/audio`)
+
+The `AudioDemodulator` chain runs on the DSP thread:
+
+1. **cu8 → complex.**
+2. **Shift.** `FrequencyShifter` moves the VFO's offset to 0 Hz.
+3. **Channel filter.** `DecimatingFir` stages (factors ≤ 8) bring the signal down to the channel rate.
+4. **Squelch.** It acts on the channel's mean power, with 3 dB of hysteresis.
+5. **Demodulate.** FM uses the phase difference between consecutive samples; AM uses the envelope, then a DC blocker and a slow AGC.
+6. **De-emphasis.** 50 µs or 75 µs, wideband FM only.
+7. **Audio low-pass.** 15 kHz for WFM, 4 kHz for voice.
+8. **Resample.** `Resampler` (Catmull-Rom) to the sound card's rate.
+9. **Volume.** Applied through a squelch gate ramped over 5 ms.
+
+`configure()` allocates and `process()` never does.
+
+Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume and squelch apply between blocks; a mode, bandwidth or rate change reconfigures the chain.
+
+`AudioOutput` (miniaudio) pulls from an `AudioRing` on its own real-time thread and keeps latency under 150 ms (see DECISIONS).
+
 ## The UI (`src/ui`)
 
 - **UiKit** is the design system at the point of use. It covers:
@@ -87,7 +109,8 @@ Dependencies point one way. Nothing outside `src/platform/macos` includes an App
   - strings by `StringId` (EN and RO);
   - the shared widgets: buttons, status chips, segmented control, banners and a few line icons.
 - **MainWindow** is the fixed layout of DESIGN.md §6.
-  - **Top bar:** logo, frequency display, gain, receiver chip, LIVE/REPLAY chip, record button and theme switch.
+  - **Top bar:** logo, frequency display (the VFO) with presets, gain, mode, sound, receiver chip, LIVE/REPLAY chip, record button and settings (theme, language).
+  - **VFO.** The window keeps the VFO, an absolute frequency, and publishes its offset from the centre to the receiver every frame. Leaving the span retunes the stick off centre.
   - **Banner:** recording, or a notice or error.
   - **Body:** the spectrum area, or the empty state.
   - **Status bar.**
@@ -137,7 +160,7 @@ How often the loop draws:
 
 ## Tests
 
-`ctest --test-dir build --output-on-failure` runs 50 test cases with no stick, window or GPU. ImGui and ImPlot run headless.
+`ctest --test-dir build --output-on-failure` runs 63 test cases with no stick, window, GPU or sound card. ImGui and ImPlot run headless.
 
 | File | Checks |
 |---|---|
@@ -150,6 +173,8 @@ How often the loop draws:
 | `test_iq_files.cpp` | sidecar format; byte-exact playback; real-time pacing; **a recording replays identically** (M1 acceptance); a retune ends a recording |
 | `test_receiver.cpp` | the whole chain on recordings: rows, trace, FFT size changes, recording through the receiver; the stick identity rules |
 | `test_ui_format.cpp` | number formats; axis ticks; waterfall resampling, colouring and range fitting |
+| `test_audio.cpp` | FIR response; decimation; shifter; resampler; de-emphasis; **an FM tone demodulates back** (M2 acceptance) with neighbour rejection; NFM; AM; squelch |
+| `test_presets.cpp` | the shipped presets file; malformed files refused |
 
 `build/tests/zarescope_hardware_tests` needs a stick and is run by hand. It covers:
 

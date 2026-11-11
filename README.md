@@ -2,7 +2,12 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M1, spectrum and waterfall.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall. You can tune by typing, scrolling or clicking, and record raw IQ. It has been built and tested on recordings; the live checks wait for the development stick. See [docs/MILESTONES.md](docs/MILESTONES.md).
+> **Status: M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
+> - Listen to wideband FM, narrowband FM or AM, with squelch and presets.
+> - Tune by typing, scrolling or clicking.
+> - Record raw IQ.
+>
+> It has been built and tested on synthetic signals and recordings; the live checks wait for the development stick. See [docs/MILESTONES.md](docs/MILESTONES.md).
 
 Zarescope only receives. It never transmits and never decodes encrypted or private communications.
 

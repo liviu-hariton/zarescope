@@ -72,7 +72,26 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
 - **No sidecar.** A recording without a sidecar is refused, because the bytes alone say nothing about frequency or rate.
 - **One frequency per file.** A recording holds one frequency and one sample rate; retuning ends the recording.
 
-## Coming next
+## Presets (read)
 
-- **Presets** (M2): `resources/presets.json`.
+`resources/presets.json`, copied into the app bundle:
+
+```json
+{
+  "zarescopePresets": 1,
+  "presets": [
+    { "id": "fm-broadcast", "frequencyHz": 100000000, "mode": "wfm", "bandwidthHz": 180000 }
+  ]
+}
+```
+
+| Key | Type | Meaning |
+|---|---|---|
+| `zarescopePresets` | integer | format version, currently 1 |
+| `id` | string | unique. The UI looks up the name by id in the string table, so names exist in every language. |
+| `frequencyHz` | integer | the frequency to listen to, > 0 |
+| `mode` | string | `wfm`, `nfm`, `am` or `off` (`off` for data signals such as ADS-B and Meteor, decoded in later milestones) |
+| `bandwidthHz` | number, optional | channel width; missing or 0 = the mode's default |
+
+## Coming next
 - **Satellite catalog** (M4): `resources/sat_catalog.json`.
