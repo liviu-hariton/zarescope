@@ -24,7 +24,8 @@ struct Preset {
     std::string id;  // e.g. "fm-broadcast"
     int64_t frequencyHz = 0;
     dsp::DemodMode mode = dsp::DemodMode::Off;
-    double bandwidthHz = 0.0;  // 0 = the mode's default
+    double bandwidthHz = 0.0;    // 0 = the mode's default
+    uint32_t sampleRateSps = 0;  // 0 = keep the current rate (ADS-B needs 2 MS/s)
 };
 
 // Parses the presets file's text. Returns std::nullopt and fills `error`

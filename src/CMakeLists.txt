@@ -40,7 +40,7 @@ add_library(zarescope_device STATIC
     device/RtlSdrSource.cpp
     device/SampleSource.cpp)
 target_link_libraries(zarescope_device
-    PUBLIC zarescope_dsp zarescope_audio
+    PUBLIC zarescope_dsp zarescope_audio zarescope_adsb
     PRIVATE nlohmann_json::nlohmann_json zs_rtlsdr)
 zarescope_set_warnings(zarescope_device)
 

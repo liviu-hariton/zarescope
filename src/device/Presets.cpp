@@ -52,6 +52,7 @@ std::optional<std::vector<Preset>> parsePresets(std::string_view text, std::stri
             }
             preset.mode = *mode;
             preset.bandwidthHz = entry.value("bandwidthHz", 0.0);
+            preset.sampleRateSps = entry.value("sampleRateSps", 0U);
             if (preset.id.empty() || !ids.insert(preset.id).second) {
                 error = "presets: ids must be unique and non-empty (\"" + preset.id + "\")";
                 return std::nullopt;

@@ -11,7 +11,11 @@ namespace zarescope::device {
 
 namespace {
 
-constexpr size_t kRowSlots = 64;  // ~2 s of waterfall at 30 rows/s
+constexpr size_t kRowSlots = 64;     // ~2 s of waterfall at 30 rows/s
+constexpr size_t kAdsbSlots = 2048;  // a busy sky sends a few hundred messages a second
+// ADS-B decoding runs when 1090 MHz is this close to the centre.
+constexpr int64_t kAdsbFrequencyHz = 1'090'000'000;
+constexpr int64_t kAdsbToleranceHz = 250'000;
 constexpr auto kControlTick = std::chrono::milliseconds(100);
 constexpr auto kDspIdle = std::chrono::milliseconds(1);
 
@@ -20,7 +24,10 @@ void reserveRow(SpectrumRow& row) { row.dbfs.reserve(kMaxFftSize); }
 }  // namespace
 
 Receiver::Receiver()
-    : m_blocks(makeBlockQueue()), m_rows(kRowSlots, reserveRow), m_trace(reserveRow) {
+    : m_blocks(makeBlockQueue()),
+      m_rows(kRowSlots, reserveRow),
+      m_trace(reserveRow),
+      m_adsb(kAdsbSlots) {
     m_control = std::thread([this] { controlLoop(); });
 }
 
@@ -238,6 +245,9 @@ ReceiverStatus Receiver::status() const {
     status.channelPowerDb = m_channelPowerDb.load(std::memory_order_relaxed);
     status.squelchOpen = m_squelchOpen.load(std::memory_order_relaxed);
     status.audioRateHz = m_audioRate.load(std::memory_order_acquire);
+    status.adsbActive = m_adsbActive.load(std::memory_order_relaxed);
+    status.adsbMessages = m_adsbMessages.load(std::memory_order_relaxed);
+    status.adsbRejected = m_adsbRejected.load(std::memory_order_relaxed);
     return status;
 }
 
@@ -256,6 +266,16 @@ bool Receiver::latestTrace(SpectrumRow& out) {
     out.sampleRateSps = trace.sampleRateSps;
     out.timeUtc = trace.timeUtc;
     return true;
+}
+
+size_t Receiver::drainAdsb(const std::function<void(const AdsbMessage&)>& visit) {
+    size_t count = 0;
+    while (AdsbMessage* message = m_adsb.beginRead()) {
+        visit(*message);
+        m_adsb.commitRead();
+        ++count;
+    }
+    return count;
 }
 
 size_t Receiver::drainRows(const std::function<void(const SpectrumRow&)>& visit) {
@@ -428,6 +448,11 @@ void Receiver::dspLoop() {
         demod = m_demodSettings.readBuffer();
     }
 
+    // ADS-B.
+    adsb::ModeSDemodulator adsbDemodulator;
+    std::vector<adsb::RawMessage> adsbFound;
+    adsbFound.reserve(256);
+
     while (m_dspRunning.load(std::memory_order_acquire)) {
         if (m_fftSize.load(std::memory_order_relaxed) != fftSize) {
             fftSize = m_fftSize.load();
@@ -476,6 +501,24 @@ void Receiver::dspLoop() {
                 audioBuffer.assign(demodulator.maxAudioSamples(kBlockBytes), 0.0F);
             }
         }
+        // ADS-B, when the source is set up for it.
+        const bool adsbActive = rate == adsb::kSampleRateSps &&
+                                std::llabs(center - kAdsbFrequencyHz) <= kAdsbToleranceHz;
+        m_adsbActive.store(adsbActive, std::memory_order_relaxed);
+        if (adsbActive) {
+            adsbFound.clear();
+            adsbDemodulator.process(block->bytes, adsbFound);
+            for (const adsb::RawMessage& message : adsbFound) {
+                if (AdsbMessage* slot = m_adsb.beginWrite()) {
+                    slot->message = message;
+                    slot->time = block->firstSampleUtc;
+                    m_adsb.commitWrite();
+                }
+            }
+            m_adsbMessages.fetch_add(adsbFound.size(), std::memory_order_relaxed);
+            m_adsbRejected.store(adsbDemodulator.rejected(), std::memory_order_relaxed);
+        }
+
         if (demodReady) {
             const size_t n = demodulator.process(block->bytes, audioBuffer);
             m_audio->ring().write(std::span<const float>(audioBuffer.data(), n));

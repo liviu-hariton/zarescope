@@ -5,7 +5,7 @@
     { "id": "airband",      "frequencyHz": 118100000, "mode": "am",  "bandwidthHz": 8000 },
     { "id": "amateur-2m",   "frequencyHz": 145500000, "mode": "nfm", "bandwidthHz": 12500 },
     { "id": "pmr446",       "frequencyHz": 446006250, "mode": "nfm", "bandwidthHz": 12500 },
-    { "id": "adsb",         "frequencyHz": 1090000000, "mode": "off" },
+    { "id": "adsb",         "frequencyHz": 1090000000, "mode": "off", "sampleRateSps": 2000000 },
     { "id": "meteor",       "frequencyHz": 137900000, "mode": "off" }
   ]
 }

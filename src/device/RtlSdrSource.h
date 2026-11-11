@@ -52,11 +52,12 @@ struct RtlSdrSettings {
     int ppm = 0;
 };
 
-// Sample rates the RTL2832U handles reliably (librtlsdr accepts
+// Sample rates the RTL2832U handles reliably (2 MS/s is the one ADS-B
+// decoding needs) (librtlsdr accepts
 // 225 001–300 000 and 900 001–3 200 000; above 2.56 MS/s samples may drop).
 inline constexpr uint32_t kSampleRates[] = {250'000,   1'024'000, 1'536'000, 1'792'000,
-                                            1'920'000, 2'048'000, 2'160'000, 2'400'000,
-                                            2'560'000, 2'880'000, 3'200'000};
+                                            1'920'000, 2'000'000, 2'048'000, 2'160'000,
+                                            2'400'000, 2'560'000, 2'880'000, 3'200'000};
 
 // The frequency range librtlsdr can tune (the R82xx tuners' upper limit).
 inline constexpr int64_t kMinFrequencyHz = 500'000;

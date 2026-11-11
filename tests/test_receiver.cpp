@@ -4,6 +4,7 @@
 // → rows and trace for the UI, plus the recorder tap. Also the stick
 // identity check, which needs no stick.
 
+#include "decoders/adsb/Encoder.h"
 #include "device/DeviceIdentity.h"
 #include "device/IqMetadata.h"
 #include "device/Receiver.h"
@@ -206,4 +207,42 @@ TEST_CASE("devices: listing the sticks works with none plugged in") {
     for (const auto& device : devices) {
         CHECK_FALSE(device.name.empty());
     }
+}
+
+TEST_CASE("receiver: decodes ADS-B from a 2 MS/s recording at 1090 MHz (M3)") {
+    const TempDir dir;
+    // A few messages with gaps, then silence to fill the recording.
+    std::vector<uint8_t> iq(4000, 128);
+    const std::vector<zarescope::adsb::RawMessage> sent{
+        zarescope::adsb::encodeIdentification(0x4B1234, "TAROM12"),
+        zarescope::adsb::encodeAirbornePosition(0x4B1234, 44.5, 26.0, 33000, false),
+        zarescope::adsb::encodeAirbornePosition(0x4B1234, 44.5, 26.0, 33000, true),
+    };
+    for (const auto& message : sent) {
+        zarescope::adsb::modulate(message, 0.4F, 0.3F, iq);
+        iq.insert(iq.end(), 3000, 128);
+    }
+    iq.resize(kBlockBytes * 3, 128);
+    const auto path = dir.path / "adsb.cu8";
+    std::ofstream(path, std::ios::binary)
+        .write(reinterpret_cast<const char*>(iq.data()), static_cast<std::streamsize>(iq.size()));
+    IqMetadata metadata;
+    metadata.centerFrequencyHz = 1'090'000'000;
+    metadata.sampleRateSps = 2'000'000;
+    metadata.startUtc = system_clock::now();
+    std::string error;
+    REQUIRE(writeSidecar(path, metadata, error));
+
+    Receiver receiver;
+    receiver.openFile(path, {.realTime = false, .loop = false});
+    std::vector<std::string> received;
+    REQUIRE(waitFor([&] {
+        receiver.drainAdsb(
+            [&](const AdsbMessage& m) { received.push_back(zarescope::adsb::toHex(m.message)); });
+        return received.size() >= sent.size();
+    }));
+    for (size_t i = 0; i < sent.size(); ++i) {
+        CHECK(received[i] == zarescope::adsb::toHex(sent[i]));
+    }
+    CHECK(receiver.status().adsbMessages >= sent.size());
 }

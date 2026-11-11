@@ -16,6 +16,7 @@
 #pragma once
 
 #include "audio/AudioOutput.h"
+#include "decoders/adsb/Demodulator.h"
 #include "device/FileSource.h"
 #include "device/IqRecorder.h"
 #include "device/RtlSdrSource.h"
@@ -75,6 +76,17 @@ struct ReceiverStatus {
     bool squelchOpen = false;
     uint32_t audioRateHz = 0;  // 0 until the sound output runs
     std::string audioError;    // why there is no sound, if so
+    // ADS-B (M3): decoding runs whenever the source is at 2 MS/s with
+    // 1090 MHz near the centre.
+    bool adsbActive = false;
+    uint64_t adsbMessages = 0;
+    uint64_t adsbRejected = 0;
+};
+
+// One decoded Mode S message and when it arrived.
+struct AdsbMessage {
+    adsb::RawMessage message;
+    std::chrono::system_clock::time_point time;
 };
 
 class Receiver {
@@ -121,6 +133,9 @@ public:
     // Calls `visit` for every waterfall row produced since the last call,
     // oldest first. Returns how many there were.
     size_t drainRows(const std::function<void(const SpectrumRow&)>& visit);
+
+    // Calls `visit` for every ADS-B message decoded since the last call.
+    size_t drainAdsb(const std::function<void(const AdsbMessage&)>& visit);
 
     // For tests: blocks until the control thread has run every command
     // posted so far.
@@ -179,6 +194,12 @@ private:
     std::unique_ptr<audio::AudioOutput> m_audio;
     std::atomic<uint32_t> m_audioRate{0};
     std::atomic<float> m_channelPowerDb{-200.0F};
+
+    // ADS-B: DSP thread → UI.
+    dsp::SpscSlots<AdsbMessage> m_adsb;
+    std::atomic<bool> m_adsbActive{false};
+    std::atomic<uint64_t> m_adsbMessages{0};
+    std::atomic<uint64_t> m_adsbRejected{0};
     std::atomic<bool> m_squelchOpen{false};
 
     // Status, written by the control thread.
