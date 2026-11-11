@@ -57,9 +57,12 @@ zarescope_set_warnings(zarescope_adsb)
 
 add_library(zarescope_sat STATIC
     sat/Orbit.cpp
-    sat/SatCatalog.cpp)
+    sat/SatCatalog.cpp
+    sat/SatelliteService.cpp)
 target_include_directories(zarescope_sat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(zarescope_sat PRIVATE zs_sgp4 nlohmann_json::nlohmann_json)
+target_link_libraries(zarescope_sat
+    PUBLIC zarescope_device
+    PRIVATE zs_sgp4 nlohmann_json::nlohmann_json CURL::libcurl)
 zarescope_set_warnings(zarescope_sat)
 
 add_library(zarescope_theme STATIC
@@ -77,25 +80,28 @@ add_library(zarescope_ui STATIC
     ui/FrequencyDisplay.cpp
     ui/LogoMark.cpp
     ui/MainWindow.cpp
+    ui/SatelliteView.cpp
     ui/SpectrumView.cpp
     ui/Strings.cpp
     ui/Typography.cpp
     ui/UiKit.cpp
     ui/WaterfallColors.cpp)
-target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zs_imgui zs_implot)
+target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zs_imgui zs_implot)
 zarescope_set_warnings(zarescope_ui)
 
 if(APPLE)
     add_library(zarescope_platform STATIC
         platform/macos/MacAppPaths.mm
         platform/macos/MacFileDialog.mm
+        platform/macos/MacNotifier.mm
         platform/macos/MacWindowAppearance.mm
         platform/macos/MetalRenderer.mm)
     target_compile_options(zarescope_platform PRIVATE -fobjc-arc)
     target_include_directories(zarescope_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(zarescope_platform
         PUBLIC zs_imgui_metal
-        PRIVATE "-framework Cocoa" "-framework Foundation" "-framework UniformTypeIdentifiers")
+        PRIVATE "-framework Cocoa" "-framework Foundation" "-framework UniformTypeIdentifiers"
+                "-framework UserNotifications")
     zarescope_set_warnings(zarescope_platform)
 else()
     message(FATAL_ERROR "Zarescope v1 builds on macOS (Apple Silicon) only; Linux and Windows are later targets")

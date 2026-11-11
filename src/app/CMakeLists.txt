@@ -5,6 +5,7 @@
 #   Contents/MacOS/Zarescope                 the executable
 #   Contents/Resources/zarescope.tokens.json the design tokens
 #   Contents/Resources/presets.json          presets (resources/presets.json)
+#   Contents/Resources/sat_catalog.json      satellites (resources/sat_catalog.json)
 #   Contents/Resources/fonts/                Inter, JetBrains Mono and their licences
 #   Contents/Resources/Zarescope.icns        built from design/brand/app-icon
 #
@@ -23,7 +24,8 @@ add_custom_command(
 set_source_files_properties("${ZARESCOPE_ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
 set(ZARESCOPE_PRESETS_FILE "${PROJECT_SOURCE_DIR}/resources/presets.json")
-set_source_files_properties("${ZARESCOPE_TOKENS_FILE}" "${ZARESCOPE_PRESETS_FILE}"
+set(ZARESCOPE_CATALOG_FILE "${PROJECT_SOURCE_DIR}/resources/sat_catalog.json")
+set_source_files_properties("${ZARESCOPE_TOKENS_FILE}" "${ZARESCOPE_PRESETS_FILE}" "${ZARESCOPE_CATALOG_FILE}"
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
 file(GLOB ZARESCOPE_FONT_FILES CONFIGURE_DEPENDS
@@ -37,6 +39,7 @@ add_executable(Zarescope MACOSX_BUNDLE
     "${ZARESCOPE_ICNS}"
     "${ZARESCOPE_TOKENS_FILE}"
     "${ZARESCOPE_PRESETS_FILE}"
+    "${ZARESCOPE_CATALOG_FILE}"
     ${ZARESCOPE_FONT_FILES})
 
 # The year of the build, for the copyright line. CMake honours

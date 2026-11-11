@@ -117,10 +117,48 @@ MainWindow::MainWindow(const theme::DesignTokens& tokens, const Typography& typo
                        MainWindowServices services)
     : m_ui(tokens, typography), m_services(std::move(services)), m_spectrum(tokens) {
     m_services.receiver->setTraceSmoothing(m_traceSmoothing);
-    m_aircraft.setStation(m_services.station);
+    if (m_services.initialTab == "aircraft") {
+        m_tab = Tab::Aircraft;
+    } else if (m_services.initialTab == "satellites") {
+        m_tab = Tab::Satellites;
+    }
     if (m_services.station) {
         m_stationLat = m_services.station->latDeg;
         m_stationLon = m_services.station->lonDeg;
+        m_stationAlt = m_services.stationAltitudeM;
+        applyStation();
+    }
+}
+
+void MainWindow::applyStation() {
+    m_aircraft.setStation(adsb::LatLon{m_stationLat, m_stationLon});
+    if (m_services.satellites != nullptr) {
+        m_services.satellites->setStation(sat::Station{m_stationLat, m_stationLon, m_stationAlt});
+    }
+}
+
+// A system notification five minutes before each pass, once per pass.
+void MainWindow::notifyUpcomingPasses() {
+    if (!m_services.notify) {
+        return;
+    }
+    const auto now = sat::Clock::now();
+    for (const sat::PlannedPass& planned : m_satellites.passes) {
+        const auto lead = planned.pass.aos - now;
+        const auto key = std::make_pair(
+            planned.noradId, static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                                      planned.pass.aos.time_since_epoch())
+                                                      .count()));
+        if (lead > std::chrono::seconds(0) && lead <= std::chrono::minutes(5) &&
+            !m_notified.contains(key)) {
+            m_notified.insert(key);
+            const std::string direction(
+                m_ui.tr(planned.pass.northbound ? StringId::CompassSouth : StringId::CompassNorth));
+            m_services.notify(
+                m_ui.trf(StringId::NotifyTitle, planned.satellite),
+                m_ui.trf(StringId::NotifyBody, std::format("{:.0f}", planned.pass.maxElevationDeg),
+                         formatClock(planned.pass.aos, ClockZone::Local).substr(0, 5), direction));
+        }
     }
 }
 
@@ -152,6 +190,11 @@ void MainWindow::pullData() {
         m_tab = Tab::Aircraft;
     }
     m_wasAdsbActive = m_status.adsbActive;
+    // Satellites: the latest passes, and a notification before each one.
+    if (m_services.satellites != nullptr) {
+        m_satellites = m_services.satellites->snapshot();
+        notifyUpcomingPasses();
+    }
 
     // A newly opened source: the VFO starts on its centre frequency.
     const bool running = m_status.state == ReceiverState::Running;
@@ -423,18 +466,39 @@ void MainWindow::drawBody() {
     const float bannerHeight = drawBanner(origin.y);
     const ImVec2 contentOrigin(origin.x, origin.y + bannerHeight);
     const ImVec2 contentSize(size.x, size.y - bannerHeight);
-    if (m_status.state == ReceiverState::Running) {
-        const float tabs = drawTabs(contentOrigin, contentSize.x);
-        const ImVec2 areaOrigin(contentOrigin.x, contentOrigin.y + tabs);
-        const ImVec2 areaSize(contentSize.x, contentSize.y - tabs);
-        if (m_tab == Tab::Aircraft) {
+    // The tabs are always there: satellite passes need no receiver.
+    const float tabs = drawTabs(contentOrigin, contentSize.x);
+    const ImVec2 areaOrigin(contentOrigin.x, contentOrigin.y + tabs);
+    const ImVec2 areaSize(contentSize.x, contentSize.y - tabs);
+    const bool running = m_status.state == ReceiverState::Running;
+    switch (m_tab) {
+    case Tab::Aircraft:
+        if (running) {
             drawAircraftArea(areaOrigin, areaSize);
         } else {
-            drawSpectrumArea(areaOrigin, areaSize);
+            drawEmptyState(areaOrigin, areaSize);
         }
-    } else {
-        drawEmptyState(contentOrigin, contentSize);
+        break;
+    case Tab::Satellites: {
+        const float pad = m_ui.spacing("16");
+        m_satelliteView.draw(m_ui, ImVec2(areaOrigin.x + pad, areaOrigin.y),
+                             ImVec2(areaSize.x - 2.0F * pad, areaSize.y - pad), m_satellites,
+                             m_services.satellites != nullptr ? m_services.satellites->catalog()
+                                                              : std::vector<sat::Satellite>{});
+        break;
     }
+    case Tab::Spectrum:
+        if (running) {
+            drawSpectrumArea(areaOrigin, areaSize);
+        } else {
+            drawEmptyState(areaOrigin, areaSize);
+        }
+        break;
+    }
+    // The areas place their widgets with SetCursorScreenPos; end with an
+    // item at the origin so ImGui doesn't read that as growing the window.
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy(ImVec2(0.0F, 0.0F));
     ImGui::EndChild();
 }
 
@@ -486,9 +550,10 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
                                           ? cstr(m_ui.tr(StringId::TabAircraft))
                                           : cstr(m_ui.tr(StringId::TabAircraft)) + " · " +
                                                 std::to_string(m_aircraft.aircraft().size());
-    const std::array<std::pair<Tab, std::string>, 2> tabs{{
+    const std::array<std::pair<Tab, std::string>, 3> tabs{{
         {Tab::Spectrum, cstr(m_ui.tr(StringId::TabSpectrum))},
         {Tab::Aircraft, aircraftLabel},
+        {Tab::Satellites, cstr(m_ui.tr(StringId::TabSatellites))},
     }};
     const float rule = m_ui.tokens().border("focus").value_or(2.0F);
     float x = origin.x + pad;
@@ -513,7 +578,7 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
     }
 
     // FFT information, right-aligned on the spectrum tab; opens its settings.
-    if (m_tab == Tab::Spectrum) {
+    if (m_tab == Tab::Spectrum && m_status.state == ReceiverState::Running) {
         const double binHz = m_status.source.sampleRateSps /
                              static_cast<double>(std::max<size_t>(m_status.fftSize, 1));
         const std::string binText = binHz >= 1000.0 ? std::format("{:.2f} kHz", binHz / 1000.0)
@@ -1016,10 +1081,20 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
     ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
     ImGui::InputDouble(cstr(m_ui.tr(StringId::LongitudeLabel)).c_str(), &m_stationLon, 0.0, 0.0,
                        "%.4f");
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    ImGui::InputDouble(cstr(m_ui.tr(StringId::AltitudeLabel)).c_str(), &m_stationAlt, 0.0, 0.0,
+                       "%.0f");
     m_stationLat = std::clamp(m_stationLat, -90.0, 90.0);
     m_stationLon = std::clamp(m_stationLon, -180.0, 180.0);
+    m_stationAlt = std::clamp(m_stationAlt, -500.0, 9000.0);
     if (ImGui::Button(cstr(m_ui.tr(StringId::UseLocation)).c_str())) {
-        m_aircraft.setStation(adsb::LatLon{m_stationLat, m_stationLon});
+        applyStation();
+    }
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::MinElevationLabel)).c_str());
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    if (ImGui::SliderFloat("##minElevation", &m_minElevation, 0.0F, 60.0F, "%.0f°") &&
+        m_services.satellites != nullptr) {
+        m_services.satellites->setMinElevation(m_minElevation);
     }
     ImGui::Separator();
     ImGui::TextUnformatted(cstr(m_ui.tr(StringId::LanguageLabel)).c_str());

@@ -19,3 +19,10 @@ function(zarescope_set_warnings target)
         endif()
     endif()
 endfunction()
+
+# Apple's linker notes every static library reached through two dependency
+# paths ("ignoring duplicate libraries"); that is harmless with static
+# libraries, and the noise hides real warnings.
+if(APPLE)
+    add_link_options(LINKER:-no_warn_duplicate_libraries)
+endif()

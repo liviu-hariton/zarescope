@@ -8,8 +8,11 @@
 #include "device/Receiver.h"
 #include "platform/AppPaths.h"
 #include "platform/FileDialog.h"
+#include "platform/Notifier.h"
 #include "platform/Renderer.h"
 #include "platform/WindowAppearance.h"
+#include "sat/SatCatalog.h"
+#include "sat/SatelliteService.h"
 #include "ui/MainWindow.h"
 #include "ui/Typography.h"
 #include "ui/theme/DesignTokens.h"
@@ -118,6 +121,7 @@ struct App::State {
     // The receive chain. Declared before the window so the window, which
     // refers to it, goes first.
     std::unique_ptr<device::Receiver> receiver;
+    std::unique_ptr<sat::SatelliteService> satellites;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -139,6 +143,7 @@ struct App::State {
         }
         // The window's views unregister their textures: needs the context.
         mainWindow.reset();
+        satellites.reset();  // joins its worker (a download in flight ends within its timeout)
         if (implotContext) {
             ImPlot::DestroyContext();
         }
@@ -207,6 +212,19 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     services.recordingsFolder = recordings;
     services.chooseRecording = [recordings] { return platform::chooseRecordingToOpen(recordings); };
     services.versionText = ZARESCOPE_VERSION;
+    // Satellites: the catalog, the TLE cache, CelesTrak's identifiable User-Agent.
+    if (auto catalog = sat::loadCatalog(paths.resources / "sat_catalog.json", error)) {
+        s.satellites = std::make_unique<sat::SatelliteService>(
+            std::move(*catalog), paths.userData / "tle_cache",
+            std::string("Zarescope/") + ZARESCOPE_VERSION + " (+https://zarescope.eu)");
+        services.satellites = s.satellites.get();
+    } else {
+        std::fprintf(stderr, "%s\n", error.c_str());
+    }
+    services.notify = [](const std::string& title, const std::string& body) {
+        platform::notify(title, body);
+    };
+    services.initialTab = options.tab;
     if (options.station) {
         services.station = adsb::LatLon{options.station->first, options.station->second};
     }

@@ -6,11 +6,14 @@
 
 #include "sat/Orbit.h"
 #include "sat/SatCatalog.h"
+#include "sat/SatelliteService.h"
 
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <filesystem>
 #include <format>
+#include <fstream>
 
 using namespace zarescope::sat;
 using namespace std::chrono;
@@ -200,4 +203,23 @@ TEST_CASE("sat: an orbit that never sets yields no pass and doesn't hang") {
         predictPasses(propagator, Station{0.0, 0.0, 0.0}, tle->epoch, hours{48}, 0.0);
     CHECK(passes.empty());
     CHECK(steady_clock::now() - start < seconds{10});
+}
+
+TEST_CASE("sat: the TLE cache file round-trips and refuses damage") {
+    const auto dir = std::filesystem::temp_directory_path() / "zarescope-tle-cache-test";
+    std::filesystem::remove_all(dir);
+    const TleInfo info{meteorLikeTle(), sys_days{year{2026} / November / 11} + hours{9}};
+    std::string error;
+    const auto file = dir / "99999.json";
+    REQUIRE(writeCachedTle(file, info, error));
+    const auto read = readCachedTle(file, error);
+    REQUIRE(read);
+    CHECK(read->tle.line1 == info.tle.line1);
+    CHECK(read->tle.line2 == info.tle.line2);
+    CHECK(read->tle.name == "TEST-SAT");
+    CHECK(read->fetched == info.fetched);
+    std::ofstream(file) << R"({"fetchedUtc":"2026-11-11T09:00:00Z","tle":"garbage"})";
+    CHECK_FALSE(readCachedTle(file, error));
+    CHECK_FALSE(readCachedTle(dir / "missing.json", error));
+    std::filesystem::remove_all(dir);
 }

@@ -25,8 +25,10 @@
 #include "device/Presets.h"
 #include "device/Receiver.h"
 #include "dsp/AudioDemodulator.h"
+#include "sat/SatelliteService.h"
 #include "ui/AircraftView.h"
 #include "ui/FrequencyDisplay.h"
+#include "ui/SatelliteView.h"
 #include "ui/SpectrumView.h"
 #include "ui/Strings.h"
 #include "ui/UiKit.h"
@@ -34,6 +36,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 
 namespace zarescope::ui {
@@ -56,6 +59,11 @@ struct MainWindowServices {
     // The station's location, if given on the command line (Settings can
     // change it; saving it arrives with M6).
     std::optional<adsb::LatLon> station;
+    double stationAltitudeM = 0.0;
+    // Satellites: TLEs and passes (M4); and a system notification.
+    sat::SatelliteService* satellites = nullptr;
+    std::function<void(const std::string& title, const std::string& body)> notify;
+    std::string initialTab;  // "spectrum", "aircraft", "satellites" or empty
 };
 
 class MainWindow {
@@ -80,6 +88,8 @@ private:
     void drawEmptyState(ImVec2 origin, ImVec2 size);
     void drawSpectrumArea(ImVec2 origin, ImVec2 size);
     void drawAircraftArea(ImVec2 origin, ImVec2 size);
+    void notifyUpcomingPasses();
+    void applyStation();
     // The tab strip; returns its height.
     float drawTabs(ImVec2 origin, float width);
     void drawStatusBar();
@@ -103,12 +113,17 @@ private:
     SpectrumView m_spectrum;
     AircraftView m_aircraftView;
     adsb::AircraftStore m_aircraft;
-    enum class Tab { Spectrum, Aircraft };
+    SatelliteView m_satelliteView;
+    sat::SatelliteSnapshot m_satellites;
+    std::set<std::pair<uint32_t, int64_t>> m_notified;  // passes already announced
+    enum class Tab { Spectrum, Aircraft, Satellites };
     Tab m_tab = Tab::Spectrum;
     bool m_wasAdsbActive = false;
     // Station location being edited in Settings.
     double m_stationLat = 0.0;
     double m_stationLon = 0.0;
+    double m_stationAlt = 0.0;
+    float m_minElevation = 20.0F;
 
     // This frame's view of the receiver.
     device::ReceiverStatus m_status;

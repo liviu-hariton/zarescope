@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace zarescope::app {
@@ -24,6 +25,8 @@ struct Options {
     std::optional<theme::ThemeVariant> variant;
     // Open this .cu8 recording at start-up.
     std::optional<std::filesystem::path> recording;
+    // The tab to open on: "spectrum", "aircraft" or "satellites".
+    std::string tab;
     // The station's location (latitude, longitude in degrees).
     std::optional<std::pair<double, double>> station;
 };

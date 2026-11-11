@@ -175,3 +175,7 @@ file(GLOB ZS_SGP4_SOURCES ${sgp4_SOURCE_DIR}/libsgp4/*.cpp)
 add_library(zs_sgp4 STATIC ${ZS_SGP4_SOURCES})
 target_include_directories(zs_sgp4 SYSTEM PUBLIC ${sgp4_SOURCE_DIR}/libsgp4)
 target_compile_options(zs_sgp4 PRIVATE -w)
+
+# --- libcurl (the system's) — TLE downloads from CelesTrak --------------------
+# Part of macOS; on Linux and Windows a system or vcpkg package.
+find_package(CURL REQUIRED)
