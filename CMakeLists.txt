@@ -27,7 +27,7 @@ if(APPLE)
 endif()
 
 project(Zarescope
-    VERSION 0.4.0
+    VERSION 0.5.0
     DESCRIPTION "RTL-SDR reception: live spectrum, aircraft and weather satellites"
     HOMEPAGE_URL "https://zarescope.eu"
     LANGUAGES C CXX)

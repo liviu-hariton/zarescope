@@ -2,7 +2,9 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M3, aircraft.** ADS-B is decoded at 1090 MHz and shown in a table and on a radar.
+> **Status: M4, satellites.**
+> - Meteor-M passes are predicted for 48 hours from CelesTrak's orbits, with a countdown, a polar plot and a notification before each pass.
+> - ADS-B (M3) is decoded at 1090 MHz and shown in a table and on a radar.
 >
 > **M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
 > - Listen to wideband FM, narrowband FM or AM, with squelch and presets.
@@ -38,6 +40,8 @@ open build/Zarescope.app --args --open /tmp/fm.cu8
 # or six aircraft around a station, on the radar:
 build/tools/zarescope-synth /tmp/adsb.cu8 30 --adsb --station 44.4268,26.1025
 open build/Zarescope.app --args --open /tmp/adsb.cu8 --station 44.4268,26.1025
+# the next Meteor passes over a station:
+open build/Zarescope.app --args --station 44.4268,26.1025 --tab satellites
 ```
 
 Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
@@ -64,6 +68,7 @@ src/device/         sample sources (stick, file), the receiver pipeline, IQ reco
 src/dsp/            FFT, spectrum analyser, audio chain, lock-free queues
 src/decoders/adsb/  Mode S / ADS-B: CRC, CPR, demodulator, aircraft store
 src/audio/          sound output (miniaudio)
+src/sat/            satellite catalog, TLEs, SGP4, pass prediction
 src/ui/             the Dear ImGui screens, fonts, strings (EN + RO)
 src/ui/theme/       design tokens → Dear ImGui style
 src/platform/       small interfaces; macos/ holds Metal and the macOS paths

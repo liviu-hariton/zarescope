@@ -127,3 +127,31 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 - **Station location.** It is set in Settings or with `--station`, but not saved yet; persistence comes with Settings (M6).
 - **Other downlink formats.** DF0/4/5/16/20/21 (address-overlaid parity) and surface positions are not decoded yet.
 - **Demodulation quality.** The demodulator is the classic 2 MS/s pulse comparison. Phase-corrected or 2.4 MS/s demodulation (as in readsb) would catch more weak messages.
+
+## M4 — Satellites: TLE, positions, passes ✅ (2026-11-11; checked against real CelesTrak data)
+
+- [x] `SatCatalog` from `resources/sat_catalog.json`: Meteor-M N2-3 (57166) and N2-4 (59051), LRPT at 137.9 MHz. Frequencies come only from the catalog.
+- [x] TLEs from CelesTrak's GP API by NORAD id:
+  - at most once every 12 h per satellite;
+  - User-Agent `Zarescope/<version> (+https://zarescope.eu)`;
+  - cached in `tle_cache/`, used offline, with its age shown.
+- [x] SGP4 (dnwrnr/sgp4 3.0) and the pass predictor: 48 h, AOS / TCA / LOS, maximum elevation, azimuths at AOS and LOS, direction, minimum-elevation filter (default 20°, set in Settings).
+- [x] Satellites tab:
+  - a next-pass card with a countdown;
+  - the pass list;
+  - a polar plot of the selected pass.
+- [x] A macOS notification five minutes before each AOS.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| SGP4 positions match known reference values for a fixed TLE (tolerance documented) | ✅ Vallado's verification satellite 00005 at 0 and 360 min, within 1 m and 1 mm/s (`test_sat.cpp`) |
+| Passes predicted for a fixed location and TLE are stable (golden test) | ✅ `tests/data/golden_passes.txt`, a sun-synchronous TLE over Bucharest |
+
+**Checked live.** On 2026-11-11 the app fetched both Meteor TLEs from CelesTrak. It predicted 13 passes above 20° over Bucharest in the next 48 h; the next was N2-4 at 03:30 local the following night, 87° and southbound.
+
+**Left for later.**
+
+- The station location and minimum elevation aren't saved between runs yet (Settings, M6). The notification permission prompt appears the first time a pass is five minutes away.
+- The catalog's SatDump pipeline and recording rate are placeholders, checked in M5 against the installed SatDump.

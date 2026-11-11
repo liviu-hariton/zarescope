@@ -1,6 +1,6 @@
 # Zarescope architecture
 
-This describes what exists today (end of M3). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+This describes what exists today (end of M4). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
 
 ## Threads and data flow
 
@@ -40,6 +40,7 @@ These rules hold:
 |---|---|---|
 | `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, the filters, `AudioDemodulator`, `SignalGenerator`, cu8 conversion | KissFFT |
 | `zarescope_adsb` | `ModeS`, `Cpr`, `ModeSDemodulator`, `AircraftStore`, `Encoder` | `zarescope_dsp` |
+| `zarescope_sat` | `SatCatalog`, `Orbit` (TLE, propagator, passes), `SatelliteService` | sgp4, libcurl (system), nlohmann/json, `zarescope_device` (timestamps) |
 | `zarescope_audio` | `AudioOutput`, `AudioRing` | miniaudio |
 | `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Presets`, `Receiver` | `zarescope_dsp`, `zarescope_audio`, librtlsdr (static), libusb (static), nlohmann/json |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
@@ -124,6 +125,20 @@ Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume 
   - Jumps of more than 600 km are rejected.
 - **Encoder.** Builds DF17 messages and modulates them into IQ, for tests and demo recordings only. Nothing is ever transmitted.
 
+## Satellites (`src/sat`)
+
+- **SatCatalog.** The satellites, their downlinks and, later, their SatDump pipeline, from `resources/sat_catalog.json`.
+- **Orbit.**
+  - `parseTle` checks the lines' length, their start digits and checksums, and that SGP4 accepts them.
+  - `Propagator` wraps libsgp4: TEME state, and look angles from the station.
+  - `predictPasses` scans in 30-s steps. It refines AOS and LOS by bisection to 1 s, finds the culmination by golden-section search, and never scans more than a day past its window.
+  - `passTrack` gives the polar plot's points.
+- **SatelliteService.** It has its own worker thread, and the UI reads a mutex-guarded snapshot.
+  - **Start-up.** It loads the cache.
+  - **Downloads.** It fetches stale TLEs (older than 12 h) through libcurl, HTTPS only, with answers capped at 16 KiB.
+  - **Predictions.** It predicts 48 h of passes when its inputs change, and every 10 minutes.
+- **Notifications.** `MainWindow` announces each pass five minutes before AOS through `platform::notify`.
+
 ## The UI (`src/ui`)
 
 - **UiKit** is the design system at the point of use. It covers:
@@ -132,7 +147,7 @@ Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume 
   - the shared widgets: buttons, status chips, segmented control, banners and a few line icons.
 - **MainWindow** is the fixed layout of DESIGN.md §6.
   - **Top bar:** logo, frequency display (the VFO) with presets, gain, mode, sound, receiver chip, LIVE/REPLAY chip, record button and settings (theme, language).
-  - **Tabs.** Spectrum and Aircraft (`AircraftView`: table and radar).
+  - **Tabs.** Spectrum, Aircraft (`AircraftView`: table and radar) and Satellites (`SatelliteView`: next-pass card, pass list, polar plot). They show even without a receiver.
   - **VFO.** The window keeps the VFO, an absolute frequency, and publishes its offset from the centre to the receiver every frame. Leaving the span retunes the stick off centre.
   - **Banner:** recording, or a notice or error.
   - **Body:** the spectrum area, or the empty state.
@@ -183,7 +198,7 @@ How often the loop draws:
 
 ## Tests
 
-`ctest --test-dir build --output-on-failure` runs 75 test cases with no stick, window, GPU or sound card. ImGui and ImPlot run headless.
+`ctest --test-dir build --output-on-failure` runs 82 test cases with no stick, window, GPU or sound card. ImGui and ImPlot run headless.
 
 | File | Checks |
 |---|---|
@@ -198,6 +213,7 @@ How often the loop draws:
 | `test_ui_format.cpp` | number formats; axis ticks; waterfall resampling, colouring and range fitting |
 | `test_audio.cpp` | FIR response; decimation; shifter; resampler; de-emphasis; **an FM tone demodulates back** (M2 acceptance) with neighbour rejection; NFM; AM; squelch |
 | `test_presets.cpp` | the shipped presets file; malformed files refused |
+| `test_sat.cpp` | the catalog; TLE parsing; **SGP4 against Vallado's verification values**; pass physics; **golden passes** (M4 acceptance); a never-setting orbit; the TLE cache |
 | `test_adsb.cpp` | **the Riddle's worked examples** (M3 acceptance); CRC and correction; Gillham altitude; encode → decode; the demodulator on noisy IQ across block edges; the store |
 
 `build/tests/zarescope_hardware_tests` needs a stick and is run by hand. It covers:

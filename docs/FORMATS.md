@@ -122,4 +122,20 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
 | `satdumpPipeline` | the SatDump pipeline that decodes a recording. **To be checked against `satdump --help` in M5** before use. |
 | `recordSampleRateSps` | sample rate for pass recordings. **Chosen in M5** from SatDump's documentation. |
 
+## TLE cache (written and read)
+
+`~/Library/Application Support/Zarescope/tle_cache/<noradId>.json`, one per satellite:
+
+```json
+{
+  "fetchedUtc": "2026-11-11T21:42:43.824Z",
+  "tle": "METEOR-M2 4\n1 59051U 24039A   26315.61954905 …\n2 59051  98.7240 …\n"
+}
+```
+
+- **`fetchedUtc`.** When it was downloaded. It decides the 12-hour refresh and the age the UI shows.
+- **`tle`.** CelesTrak's text, as received.
+
+A damaged file is ignored, and the TLE is fetched again.
+
 ## Coming next

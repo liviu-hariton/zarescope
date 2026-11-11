@@ -231,3 +231,39 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Decision.** The UI hands messages to the `AircraftStore` stamped with the time they arrived, not the samples' timestamp.
 - **Why.** A replayed recording carries its original times, so expiry would remove every aircraft on arrival. Live, the two times are the same.
 - **Rejected.** A replay clock in the store: more state for no visible gain.
+
+## 2026-11-11 — Orbits with dnwrnr/sgp4, TLEs from CelesTrak
+
+- **Decision.**
+  - **Propagation.** dnwrnr/sgp4 3.0 (Apache-2.0), pinned.
+  - **Downloads.** TLEs are fetched one satellite at a time from `gp.php?CATNR=<id>&FORMAT=TLE`, with the system's libcurl:
+    - at most every 12 h per satellite;
+    - HTTPS only;
+    - answers capped at 16 KiB;
+    - an identifiable User-Agent;
+    - cached as JSON with the fetch time.
+  - **Validation.** A TLE is accepted only when its checksums pass and SGP4 can initialise on it.
+- **Why.**
+  - The brief names that library, and it implements Vallado's 2006 SGP4. Our test reproduces Vallado's verification values to the metre.
+  - CelesTrak's policy asks for low request rates and an identifiable client.
+  - TLEs from the network are untrusted, so they are validated before the predictor uses them.
+- **Rejected.**
+  - Fetching the whole "weather" group: more data than two satellites need.
+  - Space-Track: it requires an account.
+
+## 2026-11-11 — Pass prediction: scan, bisect, golden-section
+
+- **Decision.**
+  - Scan elevation in 30-s steps and bisect each horizon crossing to 1 s.
+  - Find the culmination by golden-section search, and drop passes under the minimum elevation.
+  - Stop a day past the window at most.
+- **Why.**
+  - A LEO pass lasts minutes, so 30-s steps can't skip one, and bisection makes AOS and LOS exact.
+  - Elevation has one maximum per pass.
+  - The hard stop protects against orbits that never set.
+- **Rejected.** Analytic pass prediction: fragile with real TLEs, and this costs a few milliseconds per satellite per 48 h on the worker.
+
+## 2026-11-11 — The tabs show without a receiver
+
+- **Decision.** Spectrum, Aircraft and Satellites are always reachable. Without a source, Spectrum and Aircraft show the empty state; Satellites works fully.
+- **Why.** Pass prediction needs only a station and TLEs. Planning a Meteor pass shouldn't require plugging in the stick first.
