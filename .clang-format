@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Run before every commit:
+#   xcrun clang-format -i $(git ls-files 'src/*.cpp' 'src/*.h' 'src/*.mm' 'tests/*.cpp')
+BasedOnStyle: Google
+Standard: c++20
+IndentWidth: 4
+ColumnLimit: 100
+AccessModifierOffset: -4
+IndentCaseLabels: false
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+DerivePointerAlignment: false
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2
+FixNamespaceComments: true
+# Keep the include groups as written: own header, project headers, third
+# party, standard library.
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+---
+Language: ObjC
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 100
+AccessModifierOffset: -4
+IndentCaseLabels: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2
+FixNamespaceComments: true
+IncludeBlocks: Preserve
