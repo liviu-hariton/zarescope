@@ -8,11 +8,11 @@ Zarescope only receives. It never transmits and never decodes encrypted or priva
 
 ## Hardware
 
-Any RTL2832U dongle supported by librtlsdr. Development uses the **RTL-SDR Blog V3** (R820T2 tuner, 1 ppm TCXO, bias-tee) with its dipole antenna kit. The RTL-SDR Blog V4 and the Nooelec NESDR SMArt v5 work the same way. For Meteor-M LRPT at 137 MHz, pick a dongle with a TCXO; cheap ones without it drift as they warm up.
+Any RTL2832U dongle supported by librtlsdr: the RTL-SDR Blog V4 (development stick), V4 Lite and V3, the Nooelec NESDR SMArt v5, and generic R820T/R860 sticks. The V4 is out of production, so the V3 is the one to buy today. For Meteor-M LRPT at 137 MHz, pick a dongle with a TCXO; cheap ones without it drift as they warm up.
 
 ## Building (macOS, Apple Silicon)
 
-You need the Xcode Command Line Tools, CMake ≥ 3.25 and Ninja. Every library (GLFW, Dear ImGui, nlohmann/json, doctest) is downloaded by CMake at a pinned version and checked against its SHA-256.
+You need the Xcode Command Line Tools, CMake ≥ 3.25 and Ninja. Every library (GLFW, Dear ImGui, ImPlot, KissFFT, librtlsdr, libusb, nlohmann/json, doctest) is downloaded by CMake at a pinned version and checked against its SHA-256, and linked statically: the app depends only on macOS itself.
 
 ```bash
 xcode-select --install
@@ -29,7 +29,7 @@ open build/Zarescope.app --args --theme light
 
 Run from a terminal to see start-up errors: `build/Zarescope.app/Contents/MacOS/Zarescope`.
 
-The tests need no receiver, window or GPU. Warnings are errors in Zarescope's own code; pass `-DZARESCOPE_WERROR=OFF` to relax that while experimenting.
+The tests need no receiver, window or GPU. With a stick plugged in, `build/tests/zarescope_hardware_tests` checks it: what it claims to be, whether its tuner agrees, and whether it streams at the requested rate. Warnings are errors in Zarescope's own code; pass `-DZARESCOPE_WERROR=OFF` to relax that while experimenting.
 
 ## Code style
 

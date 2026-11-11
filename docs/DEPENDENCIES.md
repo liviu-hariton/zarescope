@@ -12,7 +12,7 @@ Every third-party component, with its version, licence and reason. A new depende
 | [ImPlot](https://github.com/epezent/implot) | 1.1 | MIT | The spectrum plot and its frequency axis | FetchContent, built as `zs_implot` |
 | [KissFFT](https://github.com/mborgerding/kissfft) | 131.1.0 | BSD-3-Clause | FFT behind `dsp::FftEngine` (vDSP may follow in v2) | FetchContent, `kiss_fft.c` only, as `zs_kissfft` |
 | [librtlsdr, RTL-SDR Blog fork](https://github.com/rtlsdrblog/rtl-sdr-blog) | V1.4.0 (2026-08) | GPL-2.0-or-later | Access to the RTL-SDR stick; this release recognises the Blog V4 (R828D) and V4 Lite (R828S) | FetchContent, the library and tuner sources built as static `zs_rtlsdr` (no pkg-config needed) |
-| [libusb](https://libusb.info) | 1.0.30 (Homebrew) | LGPL-2.1-or-later | USB access for librtlsdr | `brew install libusb`; the static `libusb-1.0.a` is linked, with IOKit, CoreFoundation and Security |
+| [libusb](https://libusb.info) | 1.0.30 (via [libusb-cmake](https://github.com/libusb/libusb-cmake) v1.0.30-0) | LGPL-2.1-or-later | USB access for librtlsdr | FetchContent, built static for our deployment target (Homebrew's static library targets the newest macOS only) |
 
 ## Tests only
 

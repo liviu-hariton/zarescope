@@ -108,24 +108,23 @@ target_link_libraries(zs_implot PUBLIC zs_imgui)
 add_library(zs_kissfft STATIC ${kissfft_SOURCE_DIR}/kiss_fft.c)
 target_include_directories(zs_kissfft SYSTEM PUBLIC ${kissfft_SOURCE_DIR})
 
-# --- libusb (LGPL-2.1-or-later), from Homebrew: `brew install libusb` ---------
-# Linked statically so the app bundle carries it (M7). Its static form needs
-# the frameworks below (from libusb-1.0.pc, Libs.private).
-find_path(ZS_LIBUSB_INCLUDE_DIR libusb.h
-    PATH_SUFFIXES libusb-1.0
-    HINTS /opt/homebrew/opt/libusb/include /usr/local/opt/libusb/include)
-find_library(ZS_LIBUSB_STATIC NAMES libusb-1.0.a
-    HINTS /opt/homebrew/opt/libusb/lib /usr/local/opt/libusb/lib)
-if(NOT ZS_LIBUSB_INCLUDE_DIR OR NOT ZS_LIBUSB_STATIC)
-    message(FATAL_ERROR "libusb not found. Install it with: brew install libusb")
-endif()
-add_library(zs_libusb INTERFACE)
-target_include_directories(zs_libusb SYSTEM INTERFACE ${ZS_LIBUSB_INCLUDE_DIR})
-target_link_libraries(zs_libusb INTERFACE ${ZS_LIBUSB_STATIC})
-if(APPLE)
-    target_link_libraries(zs_libusb INTERFACE
-        objc "-framework IOKit" "-framework CoreFoundation" "-framework Security")
-endif()
+# --- libusb 1.0.30 (LGPL-2.1-or-later) — USB access for librtlsdr ------------
+# The libusb project's own CMake build (libusb-cmake), which carries the
+# libusb sources. Built here, static, for our deployment target: Homebrew's
+# libusb-1.0.a is built for the newest macOS only, which would break the
+# bundle on older systems (M7).
+set(LIBUSB_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(LIBUSB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(LIBUSB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LIBUSB_INSTALL_TARGETS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(libusb
+    URL https://github.com/libusb/libusb-cmake/archive/refs/tags/v1.0.30-0.tar.gz
+    URL_HASH SHA256=c8143ceba42b7b93d484ccd09db7be261bb9b15f61dae5fdc605a01a6913bada
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SYSTEM)
+FetchContent_MakeAvailable(libusb)
+# Upstream C code: keep its warnings out of our build log.
+target_compile_options(usb-1.0 PRIVATE -w)
 
 # zs_rtlsdr: librtlsdr with its tuner drivers, static (rtlsdr_STATIC empties
 # the export macro).
@@ -141,4 +140,4 @@ target_include_directories(zs_rtlsdr SYSTEM PUBLIC ${rtlsdr_SOURCE_DIR}/include)
 target_compile_definitions(zs_rtlsdr PUBLIC rtlsdr_STATIC)
 # Upstream C code: keep its warnings out of our build log.
 target_compile_options(zs_rtlsdr PRIVATE -w)
-target_link_libraries(zs_rtlsdr PUBLIC zs_libusb Threads::Threads)
+target_link_libraries(zs_rtlsdr PUBLIC usb-1.0 Threads::Threads)
