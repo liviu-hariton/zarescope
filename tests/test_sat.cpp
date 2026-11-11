@@ -182,3 +182,22 @@ TEST_CASE("sat: predicted passes are stable (golden)") {
     MESSAGE(summary);
     CHECK(summary == ZARESCOPE_GOLDEN_PASSES);
 }
+
+TEST_CASE("sat: an orbit that never sets yields no pass and doesn't hang") {
+    // Geostationary-like: 1.0027 revolutions a day, equatorial. Seen from
+    // the equator under it, it stays up forever.
+    const std::string line1 =
+        withChecksum("1 99998U 26001B   26274.00000000  .00000000  00000-0  00000-0 0  9990");
+    const std::string line2 =
+        withChecksum("2 99998   0.0100 100.0000 0001000  90.0000 270.0000  1.00270000 10000");
+    std::string error;
+    const auto tle = parseTle(line1 + "\n" + line2, error);
+    INFO(error);
+    REQUIRE(tle);
+    const Propagator propagator(*tle);
+    const auto start = steady_clock::now();
+    const auto passes =
+        predictPasses(propagator, Station{0.0, 0.0, 0.0}, tle->epoch, hours{48}, 0.0);
+    CHECK(passes.empty());
+    CHECK(steady_clock::now() - start < seconds{10});
+}

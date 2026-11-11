@@ -96,13 +96,15 @@ struct Pass {
 
 // Passes whose AOS lies in [from, from + window) and that reach at least
 // `minElevationDeg`, in time order. A pass already in progress at `from` is
-// included, with its AOS in the past.
+// included, with its AOS in the past. The scan never runs more than a day
+// past the window (an orbit that never sets yields no pass). SGP4 errors
+// (a decayed orbit) propagate as exceptions: callers catch them.
 std::vector<Pass> predictPasses(const Propagator& propagator, const Station& station,
                                 Clock::time_point from, std::chrono::hours window,
                                 double minElevationDeg);
 
 // A pass's track over the sky, `steps` + 1 points from AOS to LOS, for the
-// polar plot.
+// polar plot. Never throws: on an SGP4 error it returns the points so far.
 std::vector<LookAngle> passTrack(const Propagator& propagator, const Station& station,
                                  const Pass& pass, int steps = 60);
 

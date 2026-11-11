@@ -8,7 +8,6 @@
 #include <Observer.h>
 #include <SGP4.h>
 #include <Tle.h>
-#include <TleException.h>
 
 #include <algorithm>
 #include <cmath>
@@ -113,7 +112,10 @@ std::optional<Tle> parseTle(std::string_view text, std::string& error) {
         const libsgp4::Tle parsed(tle.name, tle.line1, tle.line2);
         tle.noradId = parsed.NoradNumber();
         tle.epoch = fromDateTime(parsed.Epoch());
-    } catch (const libsgp4::TleException& e) {
+        // Building the propagator validates the elements too (eccentricity,
+        // mean motion…): a TLE it rejects is refused here, not later.
+        const libsgp4::SGP4 check(parsed);
+    } catch (const std::exception& e) {
         error = std::string("invalid TLE: ") + e.what();
         return std::nullopt;
     }
@@ -222,7 +224,11 @@ std::vector<Pass> predictPasses(const Propagator& propagator, const Station& sta
     }
     bool above = elevationAt(propagator, station, t) > 0.0;
     std::optional<Clock::time_point> aos;
-    while (t < end || aos) {
+    // A pass that started in the window may end after it; but an orbit that
+    // never sets (geostationary, or a damaged TLE) must not keep the scan
+    // going: stop a day past the window and drop the unfinished pass.
+    const auto hardEnd = end + hours{24};
+    while ((t < end || aos) && t < hardEnd) {
         const auto next = t + kStep;
         const bool nextAbove = elevationAt(propagator, station, next) > 0.0;
         if (!above && nextAbove) {
@@ -258,8 +264,12 @@ std::vector<LookAngle> passTrack(const Propagator& propagator, const Station& st
     std::vector<LookAngle> track;
     steps = std::max(steps, 1);
     const auto span = pass.los - pass.aos;
-    for (int i = 0; i <= steps; ++i) {
-        track.push_back(propagator.look(station, pass.aos + span * i / steps));
+    try {
+        for (int i = 0; i <= steps; ++i) {
+            track.push_back(propagator.look(station, pass.aos + span * i / steps));
+        }
+    } catch (const std::exception&) {
+        // A decaying orbit can make SGP4 give up: keep what was computed.
     }
     return track;
 }
