@@ -21,7 +21,9 @@
 
 #pragma once
 
+#include "device/Presets.h"
 #include "device/Receiver.h"
+#include "dsp/AudioDemodulator.h"
 #include "ui/FrequencyDisplay.h"
 #include "ui/SpectrumView.h"
 #include "ui/Strings.h"
@@ -48,6 +50,7 @@ struct MainWindowServices {
     // Shows the system's "open file" dialog for a .cu8 recording.
     std::function<std::optional<std::filesystem::path>()> chooseRecording;
     std::string versionText;
+    std::vector<device::Preset> presets;
 };
 
 class MainWindow {
@@ -75,8 +78,16 @@ private:
     void drawDevicePopup();
     void drawGainPopup();
     void drawFftPopup();
+    void drawAudioPopup();
+    void drawPresetsPopup();
+    void drawSettingsPopup(ShellState& state);
     void openRecording();
     void toggleRecording();
+    // Moves the VFO; retunes the stick when the VFO leaves the captured span.
+    void tuneTo(int64_t frequencyHz);
+    void setMode(dsp::DemodMode mode);
+    void applyPreset(const device::Preset& preset);
+    [[nodiscard]] Vfo vfo() const;
 
     UiKit m_ui;
     MainWindowServices m_services;
@@ -88,8 +99,19 @@ private:
     device::RecorderStatus m_recording;
     device::SpectrumRow m_trace;
 
+    // Listening: the VFO (absolute frequency) and the demodulator settings.
+    dsp::DemodSettings m_demod;
+    int64_t m_vfoHz = 0;
+    std::string m_sourceKey;  // detects a newly opened source
+
     // Popups are opened from inside the bars but live at window level.
     bool m_openDevices = false;
+    bool m_openAudio = false;
+    bool m_openPresets = false;
+    bool m_openSettings = false;
+    ImVec2 m_audioAnchor;
+    ImVec2 m_presetsAnchor;
+    ImVec2 m_settingsAnchor;
     bool m_openGain = false;
     bool m_openFft = false;
     ImVec2 m_deviceAnchor;

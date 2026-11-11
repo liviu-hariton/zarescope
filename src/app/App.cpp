@@ -4,6 +4,7 @@
 
 #include "app/App.h"
 
+#include "device/Presets.h"
 #include "device/Receiver.h"
 #include "platform/AppPaths.h"
 #include "platform/FileDialog.h"
@@ -38,7 +39,7 @@ namespace {
 constexpr int kInitialWidth = 1280;
 constexpr int kInitialHeight = 800;
 // Below this the top bar's controls start to overlap.
-constexpr int kMinimumWidth = 960;
+constexpr int kMinimumWidth = 1120;
 constexpr int kMinimumHeight = 600;
 
 // The loop sleeps between frames when nothing happens, so an idle window
@@ -206,6 +207,11 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     services.recordingsFolder = recordings;
     services.chooseRecording = [recordings] { return platform::chooseRecordingToOpen(recordings); };
     services.versionText = ZARESCOPE_VERSION;
+    if (auto presets = device::loadPresets(paths.resources / "presets.json", error)) {
+        services.presets = std::move(*presets);
+    } else {
+        std::fprintf(stderr, "%s\n", error.c_str());  // the app still works without presets
+    }
     s.mainWindow.emplace(*s.tokens, *s.typography, std::move(services));
     if (options.recording) {
         s.receiver->openFile(*options.recording);

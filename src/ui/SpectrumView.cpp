@@ -23,10 +23,6 @@ constexpr int kWidth = 2048;
 constexpr int kHeight = 1024;
 // DESIGN.md §6: the spectrum plot is 210 px tall.
 constexpr float kSpectrumHeight = 210.0F;
-// One notch of the scroll wheel over the spectrum steps this far.
-constexpr int64_t kWheelStepHz = 100'000;
-// Clicks tune to whole kilohertz.
-constexpr int64_t kClickResolutionHz = 1'000;
 // Waterfall time labels: about every 64 points.
 constexpr float kTimeLabelSpacing = 64.0F;
 
@@ -144,8 +140,7 @@ void SpectrumView::setTrace(const device::SpectrumRow& trace) {
     }
 }
 
-std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, int64_t tunedHz,
-                                          bool canTune) {
+std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const Vfo& vfo) {
     if (floorDb != m_paintedFloor || ceilingDb != m_paintedCeiling) {
         repaintAll();
     }
@@ -169,11 +164,10 @@ std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, in
     const float waterfallTop = pos.y + spectrumH + 1.0F;
     const float waterfallH = std::max(0.0F, size.y - spectrumH - axisHeight - 1.0F);
 
+    const int64_t snap = std::max<int64_t>(vfo.snapHz, 1);
     auto xToHz = [&](float x) {
         const double mhz = lo + (static_cast<double>(x - plotX) / plotW) * (hi - lo);
-        const auto hz =
-            static_cast<int64_t>(std::llround(mhz * 1e6 / kClickResolutionHz)) * kClickResolutionHz;
-        return hz;
+        return static_cast<int64_t>(std::llround(mhz * 1e6 / static_cast<double>(snap))) * snap;
     };
     auto hzToX = [&](double hz) {
         return plotX + static_cast<float>((hz / 1e6 - lo) / (hi - lo)) * plotW;
@@ -241,13 +235,33 @@ std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, in
                     axisText, label);
     }
 
-    // Tuned-frequency marker: dashed accent line through the spectrum.
-    if (hasData && tunedHz >= static_cast<int64_t>(lo * 1e6) &&
-        tunedHz <= static_cast<int64_t>(hi * 1e6)) {
-        const float x = hzToX(static_cast<double>(tunedHz));
+    // The VFO: a dashed accent line at the listening frequency and, when a
+    // mode is on, the channel's edges with a bracket along the top.
+    const int64_t loHz = static_cast<int64_t>(lo * 1e6);
+    const int64_t hiHz = static_cast<int64_t>(hi * 1e6);
+    if (hasData && vfo.frequencyHz >= loHz && vfo.frequencyHz <= hiHz) {
+        const ImU32 accent = ui.color("accent");
+        const float x = hzToX(static_cast<double>(vfo.frequencyHz));
         for (float y = pos.y; y < pos.y + spectrumH; y += 8.0F) {
-            drawList.AddLine(ImVec2(x, y), ImVec2(x, std::min(y + 4.0F, pos.y + spectrumH)),
-                             ui.color("accent"), ui.border());
+            drawList.AddLine(ImVec2(x, y), ImVec2(x, std::min(y + 4.0F, pos.y + spectrumH)), accent,
+                             ui.border());
+        }
+        if (vfo.bandwidthHz > 0.0) {
+            const float left = std::max(
+                plotX, hzToX(static_cast<double>(vfo.frequencyHz) - vfo.bandwidthHz / 2.0));
+            const float right = std::min(
+                plotX + plotW, hzToX(static_cast<double>(vfo.frequencyHz) + vfo.bandwidthHz / 2.0));
+            const float rule = ui.tokens().border("focus").value_or(2.0F);
+            drawList.AddLine(ImVec2(left, pos.y), ImVec2(left, pos.y + spectrumH), accent,
+                             ui.border());
+            drawList.AddLine(ImVec2(right, pos.y), ImVec2(right, pos.y + spectrumH), accent,
+                             ui.border());
+            drawList.AddRectFilled(ImVec2(left, pos.y), ImVec2(right, pos.y + rule), accent);
+            // Short ticks on the waterfall's top edge keep the channel visible there.
+            drawList.AddLine(ImVec2(left, waterfallTop), ImVec2(left, waterfallTop + 6.0F), accent,
+                             ui.border());
+            drawList.AddLine(ImVec2(right, waterfallTop), ImVec2(right, waterfallTop + 6.0F),
+                             accent, ui.border());
         }
     }
 
@@ -318,22 +332,18 @@ std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, in
         ImGui::PushFont(ui.face(TypeRole::MonoData).font, ui.face(TypeRole::MonoData).sizePx);
         ImGui::TextUnformatted(readout.c_str());
         ImGui::PopFont();
-        if (canTune) {
-            ImGui::TextDisabled("%s", std::string(ui.tr(StringId::TuneHint)).c_str());
-        }
+        ImGui::TextDisabled("%s", std::string(ui.tr(StringId::TuneHint)).c_str());
         ImGui::EndTooltip();
         // Cursor line through both views.
         drawList.AddLine(ImVec2(mouse.x, pos.y), ImVec2(mouse.x, wfMax.y),
                          ui.color("text/secondary"), ui.border());
 
-        if (canTune) {
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                tuneTo = hz;
-            }
-            const float wheel = ImGui::GetIO().MouseWheel;
-            if (wheel != 0.0F) {
-                tuneTo = tunedHz + static_cast<int64_t>(std::lround(wheel)) * kWheelStepHz;
-            }
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            tuneTo = hz;
+        }
+        const float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0.0F) {
+            tuneTo = vfo.frequencyHz + static_cast<int64_t>(std::lround(wheel)) * vfo.stepHz;
         }
     }
     return tuneTo;

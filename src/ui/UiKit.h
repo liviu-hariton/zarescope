@@ -32,7 +32,7 @@ enum class Status { Neutral, Live, Recording, PassImminent, Success, Warning, Er
 
 // Line icons drawn with primitives (the 24-grid set in design/icons arrives
 // with an SVG rasterizer later).
-enum class Icon { None, Dot, Record, Stop, Alert, Check, ChevronDown };
+enum class Icon { None, Dot, Record, Stop, Alert, Check, ChevronDown, Settings, Speaker };
 
 class UiKit {
 public:
@@ -79,6 +79,10 @@ public:
     // A button of the control height at `pos`. Returns true when clicked.
     bool button(const char* id, ImVec2 pos, std::string_view label, ButtonKind kind,
                 Icon icon = Icon::None, bool enabled = true);
+    // A square, icon-only button; `tooltip` names it (it has no label).
+    bool iconButton(const char* id, ImVec2 pos, Icon icon, std::string_view tooltip,
+                    bool active = false);
+    [[nodiscard]] float iconButtonWidth() const { return size("control"); }
 
     [[nodiscard]] float chipWidth(std::string_view label, bool withDot) const;
     // A pill chip of the compact control height. Returns true when clicked

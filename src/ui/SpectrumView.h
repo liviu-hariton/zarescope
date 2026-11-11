@@ -14,8 +14,9 @@
 // spectrum and the waterfall share the same pixel columns, so a carrier
 // lines up in both.
 //
-// Clicking the spectrum or the waterfall tunes there; the scroll wheel over
-// them steps the frequency. Both only when the source can tune (a stick).
+// Clicking the spectrum or the waterfall moves the VFO (the listening
+// frequency) there; the scroll wheel over them steps it. The caller decides
+// whether that needs a retune of the stick.
 
 #pragma once
 
@@ -32,6 +33,14 @@
 struct ImTextureData;
 
 namespace zarescope::ui {
+
+// The listening frequency and its channel, as drawn over the spectrum.
+struct Vfo {
+    int64_t frequencyHz = 0;
+    double bandwidthHz = 0.0;  // 0: no channel drawn (no mode)
+    int64_t snapHz = 1'000;    // clicks land on multiples of this
+    int64_t stepHz = 100'000;  // one notch of the scroll wheel
+};
 
 class SpectrumView {
 public:
@@ -53,9 +62,9 @@ public:
     // Sets floorDb/ceilingDb to fit the current trace (WaterfallColors.h).
     void fitRange();
 
-    // Draws into the rectangle [pos, pos + size]. Returns a frequency when
-    // the user clicked or scrolled to tune.
-    std::optional<int64_t> draw(UiKit& ui, ImVec2 pos, ImVec2 size, int64_t tunedHz, bool canTune);
+    // Draws into the rectangle [pos, pos + size]. Returns the new VFO
+    // frequency when the user clicked or scrolled.
+    std::optional<int64_t> draw(UiKit& ui, ImVec2 pos, ImVec2 size, const Vfo& vfo);
 
     // dBFS range of the waterfall colours and the spectrum's vertical axis.
     float floorDb = -120.0F;

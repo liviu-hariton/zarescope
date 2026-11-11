@@ -37,6 +37,54 @@ constexpr float kMeasurePx = 440.0F;
 constexpr float kPopoverWidth = 360.0F;
 // DESIGN.md §5: icons in buttons and banners are 16 px.
 constexpr float kIconPx = 16.0F;
+// When the VFO leaves the captured span, the stick retunes so the VFO sits
+// this fraction of the span off centre: away from the RTL-SDR's DC spike.
+constexpr double kOffCentreFraction = 1.0 / 8.0;
+
+// Click snapping and scroll steps per mode: FM broadcast on a 50/100 kHz
+// raster, narrowband FM on 6.25/12.5 kHz, AM airband on 8.33 kHz channels.
+int64_t snapFor(dsp::DemodMode mode) {
+    switch (mode) {
+    case dsp::DemodMode::Wfm: return 50'000;
+    case dsp::DemodMode::Nfm: return 6'250;
+    case dsp::DemodMode::Am: return 1'000;
+    case dsp::DemodMode::Off: break;
+    }
+    return 1'000;
+}
+int64_t stepFor(dsp::DemodMode mode) {
+    switch (mode) {
+    case dsp::DemodMode::Wfm: return 100'000;
+    case dsp::DemodMode::Nfm: return 12'500;
+    case dsp::DemodMode::Am: return 8'333;
+    case dsp::DemodMode::Off: break;
+    }
+    return 100'000;
+}
+
+// A preset's name, from the string table.
+std::optional<StringId> presetName(std::string_view id) {
+    if (id == "fm-broadcast") {
+        return StringId::PresetFmBroadcast;
+    }
+    if (id == "airband") {
+        return StringId::PresetAirband;
+    }
+    if (id == "amateur-2m") {
+        return StringId::PresetAmateur2m;
+    }
+    if (id == "pmr446") {
+        return StringId::PresetPmr446;
+    }
+    if (id == "adsb") {
+        return StringId::PresetAdsb;
+    }
+    if (id == "meteor") {
+        return StringId::PresetMeteor;
+    }
+    return std::nullopt;
+}
+
 // Defaults for a freshly opened stick: the FM broadcast band, 2.4 MS/s
 // (the M1 default), automatic gain.
 constexpr int64_t kDefaultFrequencyHz = 100'000'000;
@@ -84,6 +132,64 @@ void MainWindow::pullData() {
     if (receiver.latestTrace(m_trace)) {
         m_spectrum.setTrace(m_trace);
     }
+
+    // A newly opened source: the VFO starts on its centre frequency.
+    const bool running = m_status.state == ReceiverState::Running;
+    const std::string key =
+        running ? m_status.source.name + (m_status.isDevice ? "#device" : "#file") : "";
+    if (key != m_sourceKey) {
+        m_sourceKey = key;
+        m_vfoHz = m_status.source.centerFrequencyHz;
+    }
+    // The demodulator listens at the VFO's offset from the centre.
+    if (running) {
+        m_demod.offsetHz = static_cast<double>(m_vfoHz - m_status.source.centerFrequencyHz);
+        receiver.setDemod(m_demod);
+    }
+}
+
+Vfo MainWindow::vfo() const {
+    return {m_vfoHz, m_demod.mode == dsp::DemodMode::Off ? 0.0 : m_demod.bandwidthHz,
+            snapFor(m_demod.mode), stepFor(m_demod.mode)};
+}
+
+void MainWindow::tuneTo(int64_t frequencyHz) {
+    const auto& source = m_status.source;
+    const double half = source.sampleRateSps / 2.0;
+    const double margin = std::max(
+        m_demod.mode == dsp::DemodMode::Off ? 0.0 : m_demod.bandwidthHz / 2.0, half * 0.05);
+    const auto center = static_cast<double>(source.centerFrequencyHz);
+    const auto lowest = static_cast<int64_t>(center - half + margin);
+    const auto highest = static_cast<int64_t>(center + half - margin);
+    frequencyHz = std::clamp(frequencyHz, device::kMinFrequencyHz, device::kMaxFrequencyHz);
+    if (m_status.isDevice) {
+        if (frequencyHz < lowest || frequencyHz > highest) {
+            const auto newCenter = std::clamp(
+                frequencyHz + static_cast<int64_t>(source.sampleRateSps * kOffCentreFraction),
+                device::kMinFrequencyHz, device::kMaxFrequencyHz);
+            m_services.receiver->setCenterFrequency(newCenter);
+        }
+        m_vfoHz = frequencyHz;
+    } else {
+        // A recording can't retune: the VFO stays inside what was captured.
+        m_vfoHz = std::clamp(frequencyHz, lowest, std::max(lowest, highest));
+    }
+}
+
+void MainWindow::setMode(dsp::DemodMode mode) {
+    if (mode == m_demod.mode) {
+        return;
+    }
+    m_demod.mode = mode;
+    m_demod.bandwidthHz = dsp::defaultBandwidthHz(mode);
+}
+
+void MainWindow::applyPreset(const device::Preset& preset) {
+    setMode(preset.mode);
+    if (preset.bandwidthHz > 0.0) {
+        m_demod.bandwidthHz = preset.bandwidthHz;
+    }
+    tuneTo(preset.frequencyHz);
 }
 
 void MainWindow::draw(ShellState& state) {
@@ -114,6 +220,9 @@ void MainWindow::draw(ShellState& state) {
     drawDevicePopup();
     drawGainPopup();
     drawFftPopup();
+    drawAudioPopup();
+    drawPresetsPopup();
+    drawSettingsPopup(state);
     ImGui::PopStyleVar(2);
 
     ImGui::End();
@@ -121,7 +230,7 @@ void MainWindow::draw(ShellState& state) {
 
 // --- Top bar ----------------------------------------------------------------------
 
-void MainWindow::drawTopBar(ShellState& state) {
+void MainWindow::drawTopBar(ShellState& /*state*/) {
     const float height = m_ui.size("topBar");
     beginArea("##topbar", height, m_ui.color("bg/surface"));
 
@@ -130,24 +239,30 @@ void MainWindow::drawTopBar(ShellState& state) {
     const float width = ImGui::GetWindowWidth();
     const float pad = m_ui.spacing("16");
     const float gap = m_ui.spacing("8");
+    const float group = m_ui.spacing("24");
     const float controlY = origin.y + (height - m_ui.size("control")) * 0.5F;
     const float chipY = origin.y + (height - m_ui.size("controlCompact")) * 0.5F;
     const bool running = m_status.state == ReceiverState::Running;
     const bool isDevice = running && m_status.isDevice;
 
-    // Left: logo, frequency, gain.
+    // Left: logo, frequency (the VFO) with its presets, gain, mode, sound.
     drawLogoSymbol(drawList, ImVec2(origin.x + pad, origin.y + (height - kTopBarLogoPx) * 0.5F),
                    kTopBarLogoPx,
                    {m_ui.logoColor("rings"), m_ui.logoColor("pass"), m_ui.color("bg/surface")});
-    float x = origin.x + pad + kTopBarLogoPx + m_ui.spacing("24");
+    float x = origin.x + pad + kTopBarLogoPx + group;
     if (running) {
         const float freqY = origin.y + (height - m_frequency.height(m_ui)) * 0.5F;
-        const int64_t shown = m_status.source.centerFrequencyHz;
-        if (auto tuned = m_frequency.draw(m_ui, ImVec2(x, freqY), shown, isDevice,
+        if (auto tuned = m_frequency.draw(m_ui, ImVec2(x, freqY), m_vfoHz, true,
                                           device::kMinFrequencyHz, device::kMaxFrequencyHz)) {
-            m_services.receiver->setCenterFrequency(*tuned);
+            tuneTo(*tuned);
         }
-        x += m_frequency.width(m_ui, shown) + m_ui.spacing("24");
+        x += m_frequency.width(m_ui, m_vfoHz) + gap;
+        if (m_ui.iconButton("##presets", ImVec2(x, controlY), Icon::ChevronDown,
+                            m_ui.tr(StringId::PresetsLabel))) {
+            m_openPresets = true;
+            m_presetsAnchor = ImVec2(x, origin.y + height);
+        }
+        x += m_ui.iconButtonWidth() + group;
     }
     if (isDevice) {
         const auto& gain = m_status.deviceSettings.gainTenthsDb;
@@ -158,19 +273,30 @@ void MainWindow::drawTopBar(ShellState& state) {
             m_openGain = true;
             m_gainAnchor = ImVec2(x, origin.y + height);
         }
+        x += m_ui.buttonWidth(label, Icon::ChevronDown) + gap;
+    }
+    if (running) {
+        const std::array<std::string_view, 4> modes{m_ui.tr(StringId::ModeOff), "WFM", "NFM", "AM"};
+        int mode = static_cast<int>(m_demod.mode);
+        if (m_ui.segmented("mode", ImVec2(x, controlY), modes.data(), 4, mode,
+                           m_ui.tr(StringId::ModeLabel))) {
+            setMode(static_cast<dsp::DemodMode>(mode));
+        }
+        x += m_ui.segmentedWidth(modes.data(), 4) + gap;
+        if (m_ui.iconButton("##audio", ImVec2(x, controlY), Icon::Speaker,
+                            m_ui.tr(StringId::AudioLabel))) {
+            m_openAudio = true;
+            m_audioAnchor = ImVec2(x, origin.y + height);
+        }
     }
 
-    // Right, from the edge inwards: theme switch, record, live chip, device chip.
-    const std::array<std::string_view, 2> themes{m_ui.tr(StringId::ThemeDark),
-                                                 m_ui.tr(StringId::ThemeLight)};
-    float right = origin.x + width - pad;
-    right -= m_ui.segmentedWidth(themes.data(), 2);
-    int selected = state.variant == theme::ThemeVariant::Dark ? 0 : 1;
-    if (m_ui.segmented("theme", ImVec2(right, controlY), themes.data(), 2, selected,
-                       m_ui.tr(StringId::ThemeLabel))) {
-        state.variant = selected == 0 ? theme::ThemeVariant::Dark : theme::ThemeVariant::Light;
+    // Right, from the edge inwards: settings, record, live chip, device chip.
+    float right = origin.x + width - pad - m_ui.iconButtonWidth();
+    if (m_ui.iconButton("##settings", ImVec2(right, controlY), Icon::Settings,
+                        m_ui.tr(StringId::SettingsLabel))) {
+        m_openSettings = true;
+        m_settingsAnchor = ImVec2(right + m_ui.iconButtonWidth(), origin.y + height);
     }
-
     if (running) {
         const bool recording = m_recording.state != RecorderState::Idle;
         const std::string_view label =
@@ -187,7 +313,6 @@ void MainWindow::drawTopBar(ShellState& state) {
         right -= gap + m_ui.chipWidth(live, true);
         m_ui.chip("##live", ImVec2(right, chipY), live, liveStatus, false, true);
     }
-
     std::string deviceLabel = cstr(m_ui.tr(StringId::ReceiverChipNone));
     if (m_status.state == ReceiverState::Opening) {
         deviceLabel = cstr(m_ui.tr(StringId::ReceiverChipOpening));
@@ -350,11 +475,8 @@ void MainWindow::drawSpectrumArea(ImVec2 origin, ImVec2 size) {
 
     const ImVec2 viewPos(origin.x, origin.y + tabHeight + m_ui.spacing("8"));
     const ImVec2 viewSize(size.x, size.y - tabHeight - m_ui.spacing("8"));
-    const bool canTune = m_status.isDevice;
-    if (auto tuned =
-            m_spectrum.draw(m_ui, viewPos, viewSize, m_status.source.centerFrequencyHz, canTune)) {
-        m_services.receiver->setCenterFrequency(
-            std::clamp(*tuned, device::kMinFrequencyHz, device::kMaxFrequencyHz));
+    if (auto tuned = m_spectrum.draw(m_ui, viewPos, viewSize, vfo())) {
+        tuneTo(*tuned);
     }
 }
 
@@ -686,6 +808,130 @@ void MainWindow::drawFftPopup() {
                        "%.0f dBFS");
     if (ImGui::Button(cstr(m_ui.tr(StringId::FitToSignal)).c_str())) {
         m_spectrum.fitRange();
+    }
+    ImGui::EndPopup();
+}
+
+void MainWindow::drawAudioPopup() {
+    if (m_openAudio) {
+        ImGui::OpenPopup("##audio");
+        m_openAudio = false;
+    }
+    ImGui::SetNextWindowPos(m_audioAnchor, ImGuiCond_Always);
+    if (!ImGui::BeginPopup("##audio")) {
+        return;
+    }
+    const float width = kPopoverWidth * 0.75F;
+    if (!m_status.audioError.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, m_ui.colorVec("error"));
+        ImGui::TextWrapped("%s", m_ui.trf(StringId::NoSoundOutput, m_status.audioError).c_str());
+        ImGui::PopStyleColor();
+    }
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::VolumeLabel)).c_str());
+    ImGui::SetNextItemWidth(width);
+    float volume = m_demod.volume * 100.0F;
+    if (ImGui::SliderFloat("##volume", &volume, 0.0F, 100.0F, "%.0f %%")) {
+        m_demod.volume = volume / 100.0F;
+    }
+
+    // Squelch, with the channel's live level next to it so the threshold
+    // can be set just above the noise.
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::SquelchLabel)).c_str());
+    ImGui::SetNextItemWidth(width);
+    constexpr float kSquelchOff = -100.0F;
+    float squelch = std::max(m_demod.squelchDb, kSquelchOff);
+    const std::string squelchText = squelch <= kSquelchOff
+                                        ? cstr(m_ui.tr(StringId::SquelchOffValue))
+                                        : formatSigned(squelch, 0) + " dBFS";
+    if (ImGui::SliderFloat("##squelch", &squelch, kSquelchOff, 0.0F, squelchText.c_str())) {
+        m_demod.squelchDb = squelch <= kSquelchOff ? -200.0F : squelch;
+    }
+    if (m_demod.mode != dsp::DemodMode::Off) {
+        const Status status = m_status.squelchOpen ? Status::Live : Status::Neutral;
+        ImGui::PushStyleColor(ImGuiCol_Text, m_ui.colorVec(UiKit::statusToken(status)));
+        ImGui::TextUnformatted(
+            m_ui.trf(StringId::SignalLevel, formatSigned(m_status.channelPowerDb, 1) + " dBFS")
+                .c_str());
+        ImGui::PopStyleColor();
+
+        ImGui::TextUnformatted(cstr(m_ui.tr(StringId::BandwidthLabel)).c_str());
+        ImGui::SetNextItemWidth(width);
+        float kHz = static_cast<float>(m_demod.bandwidthHz / 1000.0);
+        if (ImGui::SliderFloat(
+                "##bandwidth", &kHz, static_cast<float>(dsp::minBandwidthHz(m_demod.mode) / 1000.0),
+                static_cast<float>(dsp::maxBandwidthHz(m_demod.mode) / 1000.0), "%.1f kHz")) {
+            m_demod.bandwidthHz = static_cast<double>(kHz) * 1000.0;
+        }
+    }
+    if (m_demod.mode == dsp::DemodMode::Wfm) {
+        ImGui::TextUnformatted(cstr(m_ui.tr(StringId::DeemphasisLabel)).c_str());
+        if (ImGui::RadioButton(cstr(m_ui.tr(StringId::Deemphasis50)).c_str(),
+                               m_demod.deemphasisUs == 50.0)) {
+            m_demod.deemphasisUs = 50.0;
+        }
+        if (ImGui::RadioButton(cstr(m_ui.tr(StringId::Deemphasis75)).c_str(),
+                               m_demod.deemphasisUs == 75.0)) {
+            m_demod.deemphasisUs = 75.0;
+        }
+    }
+    ImGui::EndPopup();
+}
+
+void MainWindow::drawPresetsPopup() {
+    if (m_openPresets) {
+        ImGui::OpenPopup("##presetList");
+        m_openPresets = false;
+    }
+    ImGui::SetNextWindowPos(m_presetsAnchor, ImGuiCond_Always);
+    if (!ImGui::BeginPopup("##presetList")) {
+        return;
+    }
+    for (const device::Preset& preset : m_services.presets) {
+        const auto name = presetName(preset.id);
+        const std::string label = name ? cstr(m_ui.tr(*name)) : preset.id;
+        ImGui::PushID(preset.id.c_str());
+        if (ImGui::Selectable(label.c_str(), false, ImGuiSelectableFlags_None,
+                              ImVec2(kPopoverWidth * 0.6F, 0.0F))) {
+            applyPreset(preset);
+        }
+        ImGui::SameLine();
+        ImGui::PushFont(m_ui.face(TypeRole::MonoData).font, m_ui.face(TypeRole::MonoData).sizePx);
+        ImGui::TextDisabled("%s", formatFrequency(preset.frequencyHz).c_str());
+        ImGui::PopFont();
+        ImGui::PopID();
+    }
+    ImGui::EndPopup();
+}
+
+void MainWindow::drawSettingsPopup(ShellState& state) {
+    if (m_openSettings) {
+        ImGui::OpenPopup("##settings");
+        m_openSettings = false;
+    }
+    ImGui::SetNextWindowPos(m_settingsAnchor, ImGuiCond_Always, ImVec2(1.0F, 0.0F));
+    if (!ImGui::BeginPopup("##settings")) {
+        return;
+    }
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::ThemeLabel)).c_str());
+    if (ImGui::RadioButton(cstr(m_ui.tr(StringId::ThemeDark)).c_str(),
+                           state.variant == theme::ThemeVariant::Dark)) {
+        state.variant = theme::ThemeVariant::Dark;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton(cstr(m_ui.tr(StringId::ThemeLight)).c_str(),
+                           state.variant == theme::ThemeVariant::Light)) {
+        state.variant = theme::ThemeVariant::Light;
+    }
+    ImGui::Separator();
+    // Language names are written in their own language, so each is
+    // recognisable whatever the current one is.
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::LanguageLabel)).c_str());
+    if (ImGui::RadioButton("English", state.language == Language::English)) {
+        state.language = Language::English;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Română", state.language == Language::Romanian)) {
+        state.language = Language::Romanian;
     }
     ImGui::EndPopup();
 }

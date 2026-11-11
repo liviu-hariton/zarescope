@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 
 namespace zarescope::ui {
 
@@ -134,6 +135,36 @@ void UiKit::icon(ImDrawList& drawList, Icon icon, ImVec2 c, float size, ImU32 co
         drawList.AddLine(ImVec2(c.x - r * 0.1F, c.y + r * 0.3F),
                          ImVec2(c.x + r * 0.4F, c.y - r * 0.3F), color, stroke);
         break;
+    case Icon::Settings: {
+        // A gear: a ring with eight teeth.
+        drawList.AddCircle(c, r * 0.5F, color, 0, stroke);
+        for (int i = 0; i < 8; ++i) {
+            const float a = static_cast<float>(i) * 3.14159265F / 4.0F;
+            const ImVec2 dir(std::cos(a), std::sin(a));
+            drawList.AddLine(ImVec2(c.x + dir.x * r * 0.62F, c.y + dir.y * r * 0.62F),
+                             ImVec2(c.x + dir.x * r * 0.88F, c.y + dir.y * r * 0.88F), color,
+                             stroke);
+        }
+        drawList.AddCircleFilled(c, r * 0.18F, color);
+        break;
+    }
+    case Icon::Speaker: {
+        // A speaker body and two sound waves.
+        const float x0 = c.x - r * 0.8F;
+        drawList.AddRectFilled(ImVec2(x0, c.y - r * 0.25F), ImVec2(x0 + r * 0.35F, c.y + r * 0.25F),
+                               color);
+        drawList.AddTriangleFilled(ImVec2(x0 + r * 0.3F, c.y - r * 0.25F),
+                                   ImVec2(x0 + r * 0.8F, c.y - r * 0.65F),
+                                   ImVec2(x0 + r * 0.8F, c.y + r * 0.65F), color);
+        drawList.AddTriangleFilled(ImVec2(x0 + r * 0.3F, c.y - r * 0.25F),
+                                   ImVec2(x0 + r * 0.8F, c.y + r * 0.65F),
+                                   ImVec2(x0 + r * 0.3F, c.y + r * 0.25F), color);
+        drawList.PathArcTo(ImVec2(c.x + r * 0.05F, c.y), r * 0.45F, -0.8F, 0.8F);
+        drawList.PathStroke(color, stroke);
+        drawList.PathArcTo(ImVec2(c.x + r * 0.05F, c.y), r * 0.8F, -0.8F, 0.8F);
+        drawList.PathStroke(color, stroke);
+        break;
+    }
     case Icon::ChevronDown:
         drawList.AddLine(ImVec2(c.x - r * 0.4F, c.y - r * 0.15F), ImVec2(c.x, c.y + r * 0.25F),
                          color, stroke);
@@ -208,6 +239,28 @@ bool UiKit::button(const char* id, ImVec2 pos, std::string_view label, ButtonKin
                    kIconPx, color("text/secondary"));
     }
     return clicked && enabled;
+}
+
+bool UiKit::iconButton(const char* id, ImVec2 pos, Icon icon, std::string_view tooltip,
+                       bool active) {
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    const float side = size("control");
+    ImGui::SetCursorScreenPos(pos);
+    const bool clicked = ImGui::InvisibleButton(id, ImVec2(side, side));
+    if (!tooltip.empty()) {
+        ImGui::SetItemTooltip("%s", std::string(tooltip).c_str());
+    }
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 max(pos.x + side, pos.y + side);
+    drawList.AddRectFilled(pos, max,
+                           color(active    ? "accent/soft"
+                                 : hovered ? "bg/hover"
+                                           : "bg/raised"),
+                           radius("md"));
+    drawList.AddRect(pos, max, color("border/strong"), radius("md"), border());
+    this->icon(drawList, icon, ImVec2(pos.x + side * 0.5F, pos.y + side * 0.5F), kIconPx,
+               color(active ? "text/primary" : "text/secondary"));
+    return clicked;
 }
 
 // --- Chips ----------------------------------------------------------------------
