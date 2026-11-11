@@ -152,6 +152,16 @@ TEST_CASE("sidecar: missing or wrong fields are refused with a reason") {
     CHECK_FALSE(metadataFromJson(R"({"format":"cu8","centerFrequencyHz":1,"sampleRateSps":1,
                                       "startUtc":"yesterday"})",
                                  error));
+    // Implausible values (corrupt or crafted files) are refused.
+    CHECK_FALSE(metadataFromJson(R"({"format":"cu8","centerFrequencyHz":1000000000000000000,
+                                      "sampleRateSps":2400000,"startUtc":"2026-11-11T21:07:05Z"})",
+                                 error));
+    CHECK_FALSE(metadataFromJson(R"({"format":"cu8","centerFrequencyHz":-5,"sampleRateSps":2400000,
+                                      "startUtc":"2026-11-11T21:07:05Z"})",
+                                 error));
+    CHECK_FALSE(metadataFromJson(R"({"format":"cu8","centerFrequencyHz":100000000,"sampleRateSps":5,
+                                      "startUtc":"2026-11-11T21:07:05Z"})",
+                                 error));
     CHECK(sidecarPath("/x/rec.cu8") == std::filesystem::path("/x/rec.json"));
 }
 

@@ -119,8 +119,17 @@ std::optional<IqMetadata> metadataFromJson(std::string_view text, std::string& e
         IqMetadata metadata;
         metadata.centerFrequencyHz = json.at("centerFrequencyHz").get<int64_t>();
         metadata.sampleRateSps = json.at("sampleRateSps").get<uint32_t>();
-        if (metadata.sampleRateSps == 0) {
-            error = "sampleRateSps must be positive";
+        // Plausible ranges for any SDR, not just the RTL-SDR: a file from
+        // elsewhere may be wider, but values outside these are corrupt or
+        // crafted and would break the display's arithmetic.
+        if (metadata.centerFrequencyHz < 0 ||
+            metadata.centerFrequencyHz > IqMetadata::kMaxFrequencyHz) {
+            error = "centerFrequencyHz must be between 0 and 20 GHz";
+            return std::nullopt;
+        }
+        if (metadata.sampleRateSps < IqMetadata::kMinSampleRateSps ||
+            metadata.sampleRateSps > IqMetadata::kMaxSampleRateSps) {
+            error = "sampleRateSps must be between 1 kS/s and 100 MS/s";
             return std::nullopt;
         }
         auto start = parseUtcTimestamp(json.at("startUtc").get<std::string>());

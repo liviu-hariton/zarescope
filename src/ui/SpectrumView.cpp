@@ -30,6 +30,27 @@ constexpr int64_t kClickResolutionHz = 1'000;
 // Waterfall time labels: about every 64 points.
 constexpr float kTimeLabelSpacing = 64.0F;
 
+// Tick positions: multiples of `step` within [lo, hi]. Counted with integers
+// and capped, so odd ranges (a huge frequency where `step` is below the
+// floating-point resolution) can never loop forever.
+std::vector<double> axisTicks(double lo, double hi, double step) {
+    constexpr int64_t kMaxTicks = 64;
+    std::vector<double> ticks;
+    if (!std::isfinite(lo) || !std::isfinite(hi) || !std::isfinite(step) || step <= 0.0 ||
+        hi < lo) {
+        return ticks;
+    }
+    const double first = std::ceil(lo / step);
+    const double last = std::floor((hi + 1e-9) / step);
+    if (!std::isfinite(first) || !std::isfinite(last) || last - first > kMaxTicks) {
+        return ticks;
+    }
+    for (auto i = static_cast<int64_t>(first); i <= static_cast<int64_t>(last); ++i) {
+        ticks.push_back(static_cast<double>(i) * step);
+    }
+    return ticks;
+}
+
 }  // namespace
 
 SpectrumView::SpectrumView(const theme::DesignTokens& tokens)
@@ -160,18 +181,10 @@ std::optional<int64_t> SpectrumView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, in
 
     // Shared x ticks for the grid and the axis labels.
     const double step = niceStep(hi - lo, std::max(2, static_cast<int>(plotW / 110.0F)));
-    std::vector<double> ticks;
-    if (hasData) {
-        for (double t = std::ceil(lo / step) * step; t <= hi + 1e-9; t += step) {
-            ticks.push_back(t);
-        }
-    }
+    const std::vector<double> ticks = hasData ? axisTicks(lo, hi, step) : std::vector<double>{};
     const double dbStep =
         niceStep(ceilingDb - floorDb, std::max(2, static_cast<int>(spectrumH / 40.0F)));
-    std::vector<double> dbTicks;
-    for (double t = std::ceil(floorDb / dbStep) * dbStep; t <= ceilingDb + 1e-9; t += dbStep) {
-        dbTicks.push_back(t);
-    }
+    const std::vector<double> dbTicks = axisTicks(floorDb, ceilingDb, dbStep);
 
     // --- Spectrum (ImPlot) ----------------------------------------------------
     ImGui::SetCursorScreenPos(ImVec2(plotX, pos.y));

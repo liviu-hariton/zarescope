@@ -20,6 +20,10 @@ namespace zarescope::device {
 
 struct IqMetadata {
     static constexpr int kFormatVersion = 1;
+    // Accepted ranges when reading a sidecar (see metadataFromJson).
+    static constexpr int64_t kMaxFrequencyHz = 20'000'000'000;
+    static constexpr uint32_t kMinSampleRateSps = 1'000;
+    static constexpr uint32_t kMaxSampleRateSps = 100'000'000;
 
     int64_t centerFrequencyHz = 0;
     uint32_t sampleRateSps = 0;
