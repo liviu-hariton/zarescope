@@ -15,8 +15,9 @@ namespace zarescope::dsp {
 struct Carrier {
     double offsetHz = 0.0;     // from the centre frequency
     float amplitude = 0.1F;    // 1.0 = full scale
-    double deviationHz = 0.0;  // FM peak deviation; 0 = unmodulated
-    double toneHz = 1000.0;    // FM modulating tone
+    double deviationHz = 0.0;  // FM peak deviation; 0 = no FM
+    double toneHz = 1000.0;    // the modulating tone (FM or AM)
+    float amDepth = 0.0F;      // AM modulation depth 0…1; 0 = no AM
 };
 
 class SignalGenerator {

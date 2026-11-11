@@ -25,8 +25,12 @@ void SignalGenerator::generate(std::span<const Carrier> carriers, std::span<uint
             if (c.deviationHz > 0.0 && c.toneHz > 0.0) {
                 phase += (c.deviationHz / c.toneHz) * std::sin(kTwoPi * c.toneHz * t);
             }
-            re += c.amplitude * std::cos(phase);
-            im += c.amplitude * std::sin(phase);
+            double amplitude = c.amplitude;
+            if (c.amDepth > 0.0F) {
+                amplitude *= 1.0 + c.amDepth * std::sin(kTwoPi * c.toneHz * t);
+            }
+            re += amplitude * std::cos(phase);
+            im += amplitude * std::sin(phase);
         }
         re += m_noiseRms * m_noise(m_rng);
         im += m_noiseRms * m_noise(m_rng);
