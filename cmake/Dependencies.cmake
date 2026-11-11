@@ -79,7 +79,14 @@ FetchContent_Declare(miniaudio
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_SUBDIR "no-cmake-here")
 
-FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui implot kissfft rtlsdr miniaudio)
+# --- sgp4 v3.0 (Apache-2.0) — satellite orbits from TLEs ----------------------
+FetchContent_Declare(sgp4
+    URL https://github.com/dnwrnr/sgp4/archive/refs/tags/v3.0.tar.gz
+    URL_HASH SHA256=53a1ab9c2ce860af15dd8397cb4a7a1904560d72c7a78c748a34ce2755b0f301
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR "no-cmake-here")
+
+FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui implot kissfft rtlsdr miniaudio sgp4)
 
 # zs_imgui: the ImGui core plus the GLFW platform backend. Both are portable C++.
 add_library(zs_imgui STATIC
@@ -162,3 +169,9 @@ if(APPLE)
     target_link_libraries(zs_miniaudio PUBLIC
         "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
 endif()
+
+# zs_sgp4: the SGP4/SDP4 propagator (namespace libsgp4).
+file(GLOB ZS_SGP4_SOURCES ${sgp4_SOURCE_DIR}/libsgp4/*.cpp)
+add_library(zs_sgp4 STATIC ${ZS_SGP4_SOURCES})
+target_include_directories(zs_sgp4 SYSTEM PUBLIC ${sgp4_SOURCE_DIR}/libsgp4)
+target_compile_options(zs_sgp4 PRIVATE -w)

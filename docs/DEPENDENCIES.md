@@ -13,6 +13,7 @@ Every third-party component, with its version, licence and reason. A new depende
 | [KissFFT](https://github.com/mborgerding/kissfft) | 131.1.0 | BSD-3-Clause | FFT behind `dsp::FftEngine` (vDSP may follow in v2) | FetchContent, `kiss_fft.c` only, as `zs_kissfft` |
 | [librtlsdr, RTL-SDR Blog fork](https://github.com/rtlsdrblog/rtl-sdr-blog) | V1.4.0 (2026-08) | GPL-2.0-or-later | Access to the RTL-SDR stick; this release recognises the Blog V4 (R828D) and V4 Lite (R828S) | FetchContent, the library and tuner sources built as static `zs_rtlsdr` (no pkg-config needed) |
 | [miniaudio](https://miniaud.io) | 0.11.26 | Public domain (Unlicense) or MIT-0 | Sound output on every platform (CoreAudio on macOS) | FetchContent, `miniaudio.c` built as `zs_miniaudio`, playback only, system frameworks linked directly |
+| [sgp4](https://github.com/dnwrnr/sgp4) | 3.0 (2026-09) | Apache-2.0 | SGP4/SDP4 orbit propagation from TLEs (Vallado 2006) | FetchContent, `libsgp4/*.cpp` built as `zs_sgp4` |
 | [libusb](https://libusb.info) | 1.0.30 (via [libusb-cmake](https://github.com/libusb/libusb-cmake) v1.0.30-0) | LGPL-2.1-or-later | USB access for librtlsdr | FetchContent, built static for our deployment target (Homebrew's static library targets the newest macOS only) |
 
 ## Tests only
@@ -34,4 +35,4 @@ Cocoa, Foundation, Metal, QuartzCore and UniformTypeIdentifiers are part of macO
 
 ## Planned
 
-These come from the plan and are added (with their rows above) in the milestone that needs them: an SGP4 implementation, libcurl, SQLite. SatDump is an external program the user installs; it is not linked.
+These come from the plan and are added (with their rows above) in the milestone that needs them: libcurl (TLE downloads), SQLite (the journal). SatDump is an external program the user installs; it is not linked.

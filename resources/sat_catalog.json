@@ -1,0 +1,25 @@
+{
+  "zarescopeCatalog": 1,
+  "satellites": [
+    {
+      "noradId": 57166,
+      "name": "Meteor-M N2-3",
+      "active": true,
+      "downlinks": [
+        { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 }
+      ],
+      "satdumpPipeline": "meteor_m2-x_lrpt",
+      "recordSampleRateSps": 1024000
+    },
+    {
+      "noradId": 59051,
+      "name": "Meteor-M N2-4",
+      "active": true,
+      "downlinks": [
+        { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 }
+      ],
+      "satdumpPipeline": "meteor_m2-x_lrpt",
+      "recordSampleRateSps": 1024000
+    }
+  ]
+}

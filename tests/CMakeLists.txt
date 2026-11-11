@@ -19,16 +19,23 @@ add_executable(zarescope_tests
     test_iq_files.cpp
     test_presets.cpp
     test_receiver.cpp
+    test_sat.cpp
     test_typography.cpp
     test_ui_format.cpp
     test_strings_clock.cpp)
-target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device zarescope_adsb doctest::doctest)
+target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device zarescope_adsb zarescope_sat doctest::doctest)
 target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_TOKENS_FILE="${ZARESCOPE_TOKENS_FILE}"
     ZARESCOPE_LUT_CSV="${PROJECT_SOURCE_DIR}/design/tokens/waterfall-lut.csv"
     ZARESCOPE_FONTS_DIR="${ZARESCOPE_FONTS_DIR}"
-    ZARESCOPE_PRESETS_FILE="${PROJECT_SOURCE_DIR}/resources/presets.json")
+    ZARESCOPE_PRESETS_FILE="${PROJECT_SOURCE_DIR}/resources/presets.json"
+    ZARESCOPE_SAT_CATALOG_FILE="${PROJECT_SOURCE_DIR}/resources/sat_catalog.json")
+# The golden pass list for test_sat.cpp, kept as a data file.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/data/golden_passes.txt" ZARESCOPE_GOLDEN_PASSES)
+string(REPLACE "\n" "\\n" ZARESCOPE_GOLDEN_PASSES_ESCAPED "${ZARESCOPE_GOLDEN_PASSES}")
+target_compile_definitions(zarescope_tests PRIVATE
+    ZARESCOPE_GOLDEN_PASSES="${ZARESCOPE_GOLDEN_PASSES_ESCAPED}")
 zarescope_set_warnings(zarescope_tests)
 
 # One CTest test per doctest test case, so failures are reported by name.

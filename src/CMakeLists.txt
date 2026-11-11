@@ -5,6 +5,7 @@
 #
 #   zarescope_dsp       FFT, spectrum, queues    → KissFFT
 #   zarescope_adsb      Mode S / ADS-B decoder   → zarescope_dsp
+#   zarescope_sat       catalog, TLE, SGP4, passes → sgp4
 #   zarescope_audio     sound output             → miniaudio
 #   zarescope_device    sample sources, IQ files → zarescope_dsp, librtlsdr
 #   zarescope_theme     design tokens            → nlohmann/json
@@ -53,6 +54,13 @@ add_library(zarescope_adsb STATIC
 target_include_directories(zarescope_adsb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(zarescope_adsb PUBLIC zarescope_dsp)
 zarescope_set_warnings(zarescope_adsb)
+
+add_library(zarescope_sat STATIC
+    sat/Orbit.cpp
+    sat/SatCatalog.cpp)
+target_include_directories(zarescope_sat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_sat PRIVATE zs_sgp4 nlohmann_json::nlohmann_json)
+zarescope_set_warnings(zarescope_sat)
 
 add_library(zarescope_theme STATIC
     ui/theme/DesignTokens.cpp)

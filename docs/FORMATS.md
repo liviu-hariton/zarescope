@@ -93,5 +93,33 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
 | `mode` | string | `wfm`, `nfm`, `am` or `off` (`off` for data signals such as ADS-B and Meteor, decoded in later milestones) |
 | `bandwidthHz` | number, optional | channel width; missing or 0 = the mode's default |
 
+## Satellite catalog (read)
+
+`resources/sat_catalog.json`, copied into the app bundle. Frequencies live here and never in code.
+
+```json
+{
+  "zarescopeCatalog": 1,
+  "satellites": [
+    {
+      "noradId": 59051,
+      "name": "Meteor-M N2-4",
+      "active": true,
+      "downlinks": [ { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 } ],
+      "satdumpPipeline": "meteor_m2-x_lrpt",
+      "recordSampleRateSps": 1024000
+    }
+  ]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `noradId` | NORAD catalogue number, unique; the TLE is fetched by it |
+| `name` | display name |
+| `active` | false = known but not scheduled |
+| `downlinks` | frequency (Hz), mode (`lrpt`, …) and channel width (Hz) of each transmitter |
+| `satdumpPipeline` | the SatDump pipeline that decodes a recording. **To be checked against `satdump --help` in M5** before use. |
+| `recordSampleRateSps` | sample rate for pass recordings. **Chosen in M5** from SatDump's documentation. |
+
 ## Coming next
-- **Satellite catalog** (M4): `resources/sat_catalog.json`.
