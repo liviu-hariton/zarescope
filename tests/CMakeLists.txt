@@ -11,6 +11,7 @@
 add_executable(zarescope_tests
     test_main.cpp
     test_smoke.cpp
+    test_adsb.cpp
     test_audio.cpp
     test_design_tokens.cpp
     test_dsp.cpp
@@ -21,7 +22,7 @@ add_executable(zarescope_tests
     test_typography.cpp
     test_ui_format.cpp
     test_strings_clock.cpp)
-target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device doctest::doctest)
+target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device zarescope_adsb doctest::doctest)
 target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_TOKENS_FILE="${ZARESCOPE_TOKENS_FILE}"
