@@ -4,8 +4,9 @@
 # GPU: ImGui runs headless here, which is enough to check the style and the
 # fonts. Run with:  ctest --test-dir build --output-on-failure
 #
-# Tests that need real hardware arrive with M1. They will be tagged
-# "[hardware]" and left out of the default run.
+# Tests that need an RTL-SDR stick are named "[hardware] …" and live in their
+# own executable, zarescope_hardware_tests, which CTest never runs
+# (hardware tests never run by default). Run it by hand with the stick plugged in.
 
 add_executable(zarescope_tests
     test_main.cpp
@@ -14,6 +15,7 @@ add_executable(zarescope_tests
     test_dsp.cpp
     test_imgui_theme.cpp
     test_iq_files.cpp
+    test_receiver.cpp
     test_typography.cpp
     test_strings_clock.cpp)
 target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device doctest::doctest)
@@ -27,3 +29,9 @@ zarescope_set_warnings(zarescope_tests)
 # One CTest test per doctest test case, so failures are reported by name.
 include("${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake")
 doctest_discover_tests(zarescope_tests)
+
+add_executable(zarescope_hardware_tests
+    test_main.cpp
+    hardware/test_hardware.cpp)
+target_link_libraries(zarescope_hardware_tests PRIVATE zarescope_device doctest::doctest)
+zarescope_set_warnings(zarescope_hardware_tests)

@@ -21,13 +21,16 @@ target_link_libraries(zarescope_dsp PRIVATE zs_kissfft)
 zarescope_set_warnings(zarescope_dsp)
 
 add_library(zarescope_device STATIC
+    device/DeviceIdentity.cpp
     device/FileSource.cpp
     device/IqMetadata.cpp
     device/IqRecorder.cpp
+    device/Receiver.cpp
+    device/RtlSdrSource.cpp
     device/SampleSource.cpp)
 target_link_libraries(zarescope_device
     PUBLIC zarescope_dsp
-    PRIVATE nlohmann_json::nlohmann_json)
+    PRIVATE nlohmann_json::nlohmann_json zs_rtlsdr)
 zarescope_set_warnings(zarescope_device)
 
 add_library(zarescope_theme STATIC
