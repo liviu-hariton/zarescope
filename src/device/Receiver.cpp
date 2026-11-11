@@ -96,8 +96,10 @@ void Receiver::close() {
     post([this] {
         stopStreaming();
         const std::scoped_lock lock(m_statusMutex);
+        const std::string audioError = m_status.audioError;
         m_status = ReceiverStatus{};
         m_status.fftSize = m_fftSize.load();
+        m_status.audioError = audioError;
     });
 }
 
@@ -169,6 +171,37 @@ void Receiver::setTraceSmoothing(float weight) {
     m_traceWeight.store(std::clamp(weight, 0.01F, 1.0F));
 }
 
+void Receiver::setDemod(const dsp::DemodSettings& settings) {
+    const bool changed =
+        settings.mode != m_lastDemod.mode || settings.offsetHz != m_lastDemod.offsetHz ||
+        settings.bandwidthHz != m_lastDemod.bandwidthHz ||
+        settings.deemphasisUs != m_lastDemod.deemphasisUs ||
+        settings.squelchDb != m_lastDemod.squelchDb || settings.volume != m_lastDemod.volume;
+    if (!changed) {
+        return;
+    }
+    m_lastDemod = settings;
+    m_demodSettings.writeBuffer() = settings;
+    m_demodSettings.publish();
+    if (settings.mode != dsp::DemodMode::Off && !m_audioRequested) {
+        m_audioRequested = true;
+        post([this] {
+            auto output = std::make_unique<audio::AudioOutput>();
+            std::string error;
+            if (!output->start(error)) {
+                const std::scoped_lock lock(m_statusMutex);
+                m_status.audioError = error;
+                return;
+            }
+            const uint32_t rate = output->sampleRate();
+            m_audio = std::move(output);
+            // Publish the rate last: the DSP thread uses m_audio only after
+            // it sees a non-zero rate.
+            m_audioRate.store(rate, std::memory_order_release);
+        });
+    }
+}
+
 bool Receiver::startRecording(const std::filesystem::path& folder, const std::string& software) {
     const ReceiverStatus now = status();
     if (now.state != ReceiverState::Running) {
@@ -202,6 +235,9 @@ ReceiverStatus Receiver::status() const {
         status = m_status;
     }
     status.droppedRows = m_droppedRows.load(std::memory_order_relaxed);
+    status.channelPowerDb = m_channelPowerDb.load(std::memory_order_relaxed);
+    status.squelchOpen = m_squelchOpen.load(std::memory_order_relaxed);
+    status.audioRateHz = m_audioRate.load(std::memory_order_acquire);
     return status;
 }
 
@@ -295,6 +331,7 @@ void Receiver::startStreaming(std::unique_ptr<SampleSource> source) {
     }
     {
         const std::scoped_lock lock(m_statusMutex);
+        status.audioError = m_status.audioError;
         m_status = std::move(status);
     }
 
@@ -378,6 +415,19 @@ void Receiver::dspLoop() {
         }
     } sink(*this, trace, center, rate, blockTime);
 
+    // Listening. Reconfigured (allocates) only when the mode, bandwidth,
+    // de-emphasis, input rate or sound card rate change; offset, volume and
+    // squelch apply between blocks for free.
+    dsp::AudioDemodulator demodulator;
+    dsp::DemodSettings demod;
+    std::vector<float> audioBuffer;
+    uint32_t demodInputRate = 0;
+    uint32_t demodAudioRate = 0;
+    bool demodReady = false;
+    if (m_demodSettings.update()) {
+        demod = m_demodSettings.readBuffer();
+    }
+
     while (m_dspRunning.load(std::memory_order_acquire)) {
         if (m_fftSize.load(std::memory_order_relaxed) != fftSize) {
             fftSize = m_fftSize.load();
@@ -401,6 +451,37 @@ void Receiver::dspLoop() {
         blockTime = block->firstSampleUtc;
         m_recorder.offer(*block);
         analyzer->process(block->bytes, sink);
+
+        bool reconfigure = false;
+        if (m_demodSettings.update()) {
+            const dsp::DemodSettings& wanted = m_demodSettings.readBuffer();
+            reconfigure = wanted.mode != demod.mode || wanted.bandwidthHz != demod.bandwidthHz ||
+                          wanted.deemphasisUs != demod.deemphasisUs;
+            if (!reconfigure && demodReady) {
+                if (wanted.offsetHz != demod.offsetHz) {
+                    demodulator.setOffset(wanted.offsetHz);
+                }
+                demodulator.setVolume(wanted.volume);
+                demodulator.setSquelch(wanted.squelchDb);
+            }
+            demod = wanted;
+        }
+        const uint32_t audioRate = m_audioRate.load(std::memory_order_acquire);
+        if (reconfigure || rate != demodInputRate || audioRate != demodAudioRate) {
+            demodInputRate = rate;
+            demodAudioRate = audioRate;
+            demodReady = demod.mode != dsp::DemodMode::Off && audioRate > 0;
+            if (demodReady) {
+                demodulator.configure(rate, audioRate, demod);
+                audioBuffer.assign(demodulator.maxAudioSamples(kBlockBytes), 0.0F);
+            }
+        }
+        if (demodReady) {
+            const size_t n = demodulator.process(block->bytes, audioBuffer);
+            m_audio->ring().write(std::span<const float>(audioBuffer.data(), n));
+            m_channelPowerDb.store(demodulator.channelPowerDb(), std::memory_order_relaxed);
+            m_squelchOpen.store(demodulator.squelchOpen(), std::memory_order_relaxed);
+        }
         m_blocks.commitRead();
     }
 }

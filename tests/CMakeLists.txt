@@ -11,10 +11,12 @@
 add_executable(zarescope_tests
     test_main.cpp
     test_smoke.cpp
+    test_audio.cpp
     test_design_tokens.cpp
     test_dsp.cpp
     test_imgui_theme.cpp
     test_iq_files.cpp
+    test_presets.cpp
     test_receiver.cpp
     test_typography.cpp
     test_ui_format.cpp
@@ -24,7 +26,8 @@ target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_TOKENS_FILE="${ZARESCOPE_TOKENS_FILE}"
     ZARESCOPE_LUT_CSV="${PROJECT_SOURCE_DIR}/design/tokens/waterfall-lut.csv"
-    ZARESCOPE_FONTS_DIR="${ZARESCOPE_FONTS_DIR}")
+    ZARESCOPE_FONTS_DIR="${ZARESCOPE_FONTS_DIR}"
+    ZARESCOPE_PRESETS_FILE="${PROJECT_SOURCE_DIR}/resources/presets.json")
 zarescope_set_warnings(zarescope_tests)
 
 # One CTest test per doctest test case, so failures are reported by name.

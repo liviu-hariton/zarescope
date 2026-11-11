@@ -15,10 +15,12 @@
 
 #pragma once
 
+#include "audio/AudioOutput.h"
 #include "device/FileSource.h"
 #include "device/IqRecorder.h"
 #include "device/RtlSdrSource.h"
 #include "device/SampleSource.h"
+#include "dsp/AudioDemodulator.h"
 #include "dsp/SpscSlots.h"
 #include "dsp/TripleBuffer.h"
 
@@ -68,6 +70,11 @@ struct ReceiverStatus {
     uint64_t droppedBlocks = 0;  // the DSP thread fell behind the source
     uint64_t droppedRows = 0;    // the UI fell behind the DSP thread
     size_t fftSize = kDefaultFftSize;
+    // Listening (M2):
+    float channelPowerDb = -200.0F;  // power in the demodulated channel
+    bool squelchOpen = false;
+    uint32_t audioRateHz = 0;  // 0 until the sound output runs
+    std::string audioError;    // why there is no sound, if so
 };
 
 class Receiver {
@@ -93,6 +100,10 @@ public:
     void setFftSize(size_t fftSize);                // one of kFftSizes
     // Weight of each new row in the spectrum trace: 1 = no smoothing.
     void setTraceSmoothing(float weight);
+    // What to listen to: mode, offset from the centre, bandwidth, squelch,
+    // volume. Cheap to call every frame; the DSP thread picks up changes
+    // between blocks. Opens the sound output the first time a mode is set.
+    void setDemod(const dsp::DemodSettings& settings);
 
     // Starts recording what is being received into `folder`. False when
     // nothing is running or a recording is still finishing.
@@ -158,6 +169,17 @@ private:
     std::atomic<uint64_t> m_droppedRows{0};
 
     IqRecorder m_recorder;
+
+    // Listening: settings UI → DSP (latest wins), the sound output (created
+    // and started on the control thread; its ring is filled by the DSP
+    // thread once m_audioRate is non-zero), and what the DSP reports back.
+    dsp::TripleBuffer<dsp::DemodSettings> m_demodSettings;
+    dsp::DemodSettings m_lastDemod;  // UI thread: what was last published
+    bool m_audioRequested = false;   // UI thread
+    std::unique_ptr<audio::AudioOutput> m_audio;
+    std::atomic<uint32_t> m_audioRate{0};
+    std::atomic<float> m_channelPowerDb{-200.0F};
+    std::atomic<bool> m_squelchOpen{false};
 
     // Status, written by the control thread.
     mutable std::mutex m_statusMutex;

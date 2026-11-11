@@ -4,6 +4,7 @@
 # direction, so the parts without a UI can be tested on their own:
 #
 #   zarescope_dsp       FFT, spectrum, queues    → KissFFT
+#   zarescope_audio     sound output             → miniaudio
 #   zarescope_device    sample sources, IQ files → zarescope_dsp, librtlsdr
 #   zarescope_theme     design tokens            → nlohmann/json
 #   zarescope_ui        ImGui screens and style  → zarescope_theme, Dear ImGui
@@ -11,6 +12,8 @@
 #   Zarescope (app)     main() and the loop      → all of the above
 
 add_library(zarescope_dsp STATIC
+    dsp/AudioDemodulator.cpp
+    dsp/Filters.cpp
     dsp/IqConvert.cpp
     dsp/KissFftEngine.cpp
     dsp/SignalGenerator.cpp
@@ -20,16 +23,23 @@ target_include_directories(zarescope_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(zarescope_dsp PRIVATE zs_kissfft)
 zarescope_set_warnings(zarescope_dsp)
 
+add_library(zarescope_audio STATIC
+    audio/AudioOutput.cpp)
+target_include_directories(zarescope_audio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_audio PRIVATE zs_miniaudio)
+zarescope_set_warnings(zarescope_audio)
+
 add_library(zarescope_device STATIC
     device/DeviceIdentity.cpp
     device/FileSource.cpp
     device/IqMetadata.cpp
     device/IqRecorder.cpp
+    device/Presets.cpp
     device/Receiver.cpp
     device/RtlSdrSource.cpp
     device/SampleSource.cpp)
 target_link_libraries(zarescope_device
-    PUBLIC zarescope_dsp
+    PUBLIC zarescope_dsp zarescope_audio
     PRIVATE nlohmann_json::nlohmann_json zs_rtlsdr)
 zarescope_set_warnings(zarescope_device)
 

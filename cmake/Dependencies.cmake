@@ -72,7 +72,14 @@ FetchContent_Declare(rtlsdr
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_SUBDIR "no-cmake-here")
 
-FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui implot kissfft rtlsdr)
+# --- miniaudio 0.11.26 (public domain / MIT-0) — sound output -----------------
+FetchContent_Declare(miniaudio
+    URL https://github.com/mackron/miniaudio/archive/refs/tags/0.11.26.tar.gz
+    URL_HASH SHA256=838ba55a21c9142adf7b76bdc4351e5cd8b7ae128f46b25ec25f94ae9969c600
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR "no-cmake-here")
+
+FetchContent_MakeAvailable(glfw nlohmann_json doctest imgui implot kissfft rtlsdr miniaudio)
 
 # zs_imgui: the ImGui core plus the GLFW platform backend. Both are portable C++.
 add_library(zs_imgui STATIC
@@ -141,3 +148,17 @@ target_compile_definitions(zs_rtlsdr PUBLIC rtlsdr_STATIC)
 # Upstream C code: keep its warnings out of our build log.
 target_compile_options(zs_rtlsdr PRIVATE -w)
 target_link_libraries(zs_rtlsdr PUBLIC usb-1.0 Threads::Threads)
+
+# zs_miniaudio: playback only. Decoders, encoders, the node graph and the
+# engine are left out; the system audio frameworks are linked directly
+# instead of loaded at run time.
+add_library(zs_miniaudio STATIC ${miniaudio_SOURCE_DIR}/miniaudio.c)
+target_include_directories(zs_miniaudio SYSTEM PUBLIC ${miniaudio_SOURCE_DIR})
+target_compile_definitions(zs_miniaudio PUBLIC
+    MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_NO_RESOURCE_MANAGER
+    MA_NO_NODE_GRAPH MA_NO_ENGINE MA_NO_RUNTIME_LINKING)
+target_compile_options(zs_miniaudio PRIVATE -w)
+if(APPLE)
+    target_link_libraries(zs_miniaudio PUBLIC
+        "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
+endif()
