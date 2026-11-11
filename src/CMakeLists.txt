@@ -3,10 +3,21 @@
 # Zarescope's libraries. Each one is small and has a clear dependency
 # direction, so the parts without a UI can be tested on their own:
 #
+#   zarescope_dsp       FFT, spectrum, queues    → KissFFT
 #   zarescope_theme     design tokens            → nlohmann/json
 #   zarescope_ui        ImGui screens and style  → zarescope_theme, Dear ImGui
 #   zarescope_platform  Metal, macOS paths       → Dear ImGui's Metal backend
 #   Zarescope (app)     main() and the loop      → all of the above
+
+add_library(zarescope_dsp STATIC
+    dsp/IqConvert.cpp
+    dsp/KissFftEngine.cpp
+    dsp/SignalGenerator.cpp
+    dsp/SpectrumAnalyzer.cpp
+    dsp/Window.cpp)
+target_include_directories(zarescope_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_dsp PRIVATE zs_kissfft)
+zarescope_set_warnings(zarescope_dsp)
 
 add_library(zarescope_theme STATIC
     ui/theme/DesignTokens.cpp)

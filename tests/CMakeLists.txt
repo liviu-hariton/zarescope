@@ -11,10 +11,11 @@ add_executable(zarescope_tests
     test_main.cpp
     test_smoke.cpp
     test_design_tokens.cpp
+    test_dsp.cpp
     test_imgui_theme.cpp
     test_typography.cpp
     test_strings_clock.cpp)
-target_link_libraries(zarescope_tests PRIVATE zarescope_ui doctest::doctest)
+target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_dsp doctest::doctest)
 target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_TOKENS_FILE="${ZARESCOPE_TOKENS_FILE}"
