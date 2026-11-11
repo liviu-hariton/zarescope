@@ -19,6 +19,7 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 - [x] Every UI string in a central EN + RO table.
 - [x] doctest via CTest: 18 tests, no hardware, window or GPU needed.
 - [x] `.clang-format`, `.clang-tidy`, `.gitignore`, `README.md`.
+- [x] The native title bar follows the app's theme (`platform::setWindowAppearance`).
 - [x] No CI, by decision (see [DECISIONS.md](DECISIONS.md)). Build, tests and formatting are checked locally.
 
 **Acceptance.**
@@ -29,7 +30,6 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 
 **Left for later.**
 
-- The native title bar follows the macOS appearance, not the app theme. Matching it needs a small platform hook.
 - The language follows a setting that arrives in M6; English is shown until then.
 - clang-tidy hasn't been run yet; it needs `brew install llvm`.
 

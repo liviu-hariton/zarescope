@@ -89,3 +89,9 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Decision.** `CMAKE_OSX_ARCHITECTURES=arm64`, `CMAKE_OSX_DEPLOYMENT_TARGET=14.0`.
 - **Why.** The v1 target is Apple Silicon. macOS 14 covers every Apple Silicon Mac that is still updated and allows `std::format`.
 - **Rejected.** A universal binary: no Intel Mac to test on.
+
+## 2026-11-11 — The development stick is an RTL-SDR Blog V4
+
+- **Decision.** The stick bought for development is an RTL-SDR Blog V4 (R828D). It hasn't arrived yet; its authenticity is checked on arrival. The code still assumes no model, and the V3 stays the recommendation for users, because the V4 is out of production.
+- **Why.** A V4 turned up for sale after the end-of-life notice. The V4 needs the RTL-SDR Blog fork of librtlsdr, which the brief already requires.
+- **Rejected.** Changing the reference stick in the code: the earlier "assume no model" decision covers both.

@@ -27,6 +27,7 @@ zarescope_set_warnings(zarescope_ui)
 if(APPLE)
     add_library(zarescope_platform STATIC
         platform/macos/MacAppPaths.mm
+        platform/macos/MacWindowAppearance.mm
         platform/macos/MetalRenderer.mm)
     target_compile_options(zarescope_platform PRIVATE -fobjc-arc)
     target_include_directories(zarescope_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

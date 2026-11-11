@@ -60,7 +60,7 @@ Teardown runs in reverse in `App::State`'s destructor. That destructor also runs
 - **Idle.** `glfwWaitEventsTimeout(0.25 s)` sleeps when nothing happens, so an idle window costs no CPU. It still wakes four times a second to tick the clock.
 - **After input.** The loop polls for 500 ms after any input, paced by the display's vsync, so hover states and tooltips show without delay. When live data streams in (M1), the loop will draw continuously.
 - **Drawing a frame.** `Renderer::renderFrame` acquires a Metal drawable, then calls back into the app for the whole ImGui frame (`NewFrame` → `MainWindow::draw` → `Render`), then encodes and presents.
-- **Theme switch.** When the user switches theme, `applyTheme` runs again with the other variant before the next frame. The whole token set is swapped, so nothing from the old theme remains.
+- **Theme switch.** When the user switches theme, `applyTheme` runs again with the other variant before the next frame. The whole token set is swapped, so nothing from the old theme remains. `platform::setWindowAppearance` makes the native title bar follow too (on macOS, `NSWindow.appearance`).
 
 ## Fonts
 

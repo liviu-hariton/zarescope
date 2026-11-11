@@ -6,6 +6,7 @@
 
 #include "platform/AppPaths.h"
 #include "platform/Renderer.h"
+#include "platform/WindowAppearance.h"
 #include "ui/MainWindow.h"
 #include "ui/Typography.h"
 #include "ui/theme/DesignTokens.h"
@@ -65,6 +66,11 @@ bool userActive() {
     }
     return ImGui::IsAnyItemActive() || ImGui::IsAnyItemHovered() ||
            io.InputQueueCharacters.Size > 0 || ImGui::IsKeyDown(ImGuiKey_Tab) || io.NavActive;
+}
+
+platform::Appearance appearanceFor(theme::ThemeVariant variant) {
+    return variant == theme::ThemeVariant::Dark ? platform::Appearance::Dark
+                                                : platform::Appearance::Light;
 }
 
 void reportTheme(const ui::ThemeReport& report) {
@@ -159,6 +165,7 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
 
     s.shell.variant = options.variant.value_or(s.tokens->defaultVariant());
     reportTheme(ui::applyTheme(*s.tokens, s.shell.variant, ImGui::GetStyle()));
+    platform::setWindowAppearance(s.window, appearanceFor(s.shell.variant));
 
     s.mainWindow.emplace(*s.tokens, *s.typography, ZARESCOPE_VERSION);
 
@@ -201,6 +208,7 @@ int App::run() {
         // The theme switch was used: swap the whole token set.
         if (s.shell.variant != shownVariant) {
             reportTheme(ui::applyTheme(*s.tokens, s.shell.variant, ImGui::GetStyle()));
+            platform::setWindowAppearance(s.window, appearanceFor(s.shell.variant));
             lastActive = Clock::now();
         }
     }
