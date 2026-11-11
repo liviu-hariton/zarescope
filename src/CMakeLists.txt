@@ -62,6 +62,7 @@ zarescope_set_warnings(zarescope_theme)
 
 add_library(zarescope_ui STATIC
     ui/theme/ImGuiTheme.cpp
+    ui/AircraftView.cpp
     ui/theme/PlotTheme.cpp
     ui/Clock.cpp
     ui/Format.cpp
@@ -73,7 +74,7 @@ add_library(zarescope_ui STATIC
     ui/Typography.cpp
     ui/UiKit.cpp
     ui/WaterfallColors.cpp)
-target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zs_imgui zs_implot)
+target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zs_imgui zs_implot)
 zarescope_set_warnings(zarescope_ui)
 
 if(APPLE)

@@ -118,6 +118,35 @@ constexpr std::array<Entry, kStringCount> kStrings{{
     {StringId::FitToSignal, "Fit to signal", "Potrivește după semnal"},
     {StringId::TuneHint, "Click to listen here, scroll to step",
      "Clic ca să asculți aici, derulează ca să pășești"},
+    // Aircraft
+    {StringId::TabAircraft, "Aircraft", "Avioane"},
+    {StringId::ColCallsign, "Callsign", "Indicativ"},
+    {StringId::ColAltitude, "Altitude", "Altitudine"},
+    {StringId::ColSpeed, "Speed", "Viteză"},
+    {StringId::ColDistance, "Distance", "Distanță"},
+    {StringId::ColSeen, "Seen", "Văzut"},
+    {StringId::AdsbHint,
+     "Aircraft appear when the receiver listens to 1090 MHz at 2 MS/s. The Aircraft (ADS-B) preset "
+     "sets both.",
+     "Avioanele apar când receptorul ascultă 1090 MHz la 2 MS/s. Presetarea Avioane (ADS-B) le "
+     "setează pe amândouă."},
+    {StringId::TuneAdsb, "Tune to ADS-B", "Acordează pe ADS-B"},
+    {StringId::AdsbListening,
+     "Listening on 1090 MHz. Aircraft show up here as soon as one is heard; an outdoor antenna "
+     "helps a lot.",
+     "Se ascultă pe 1090 MHz. Avioanele apar aici imediat ce unul e recepționat; o antenă afară "
+     "ajută mult."},
+    {StringId::NeedStation,
+     "Set your station's location in Settings to place aircraft on the radar.",
+     "Setează locația stației în Setări ca să apară avioanele pe radar."},
+    {StringId::StationLabel, "Station location", "Locația stației"},
+    {StringId::LatitudeLabel, "Latitude (° north)", "Latitudine (° nord)"},
+    {StringId::LongitudeLabel, "Longitude (° east)", "Longitudine (° est)"},
+    {StringId::UseLocation, "Use this location", "Folosește această locație"},
+    {StringId::CompassNorth, "N", "N"},
+    {StringId::CompassEast, "E", "E"},
+    {StringId::CompassSouth, "S", "S"},
+    {StringId::CompassWest, "W", "V"},
     // Status bar
     {StringId::StatusVersion, "Zarescope", "Zarescope"},
     {StringId::StatusUtc, "UTC", "UTC"},

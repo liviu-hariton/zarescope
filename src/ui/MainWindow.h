@@ -21,9 +21,11 @@
 
 #pragma once
 
+#include "decoders/adsb/AircraftStore.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
 #include "dsp/AudioDemodulator.h"
+#include "ui/AircraftView.h"
 #include "ui/FrequencyDisplay.h"
 #include "ui/SpectrumView.h"
 #include "ui/Strings.h"
@@ -51,6 +53,9 @@ struct MainWindowServices {
     std::function<std::optional<std::filesystem::path>()> chooseRecording;
     std::string versionText;
     std::vector<device::Preset> presets;
+    // The station's location, if given on the command line (Settings can
+    // change it; saving it arrives with M6).
+    std::optional<adsb::LatLon> station;
 };
 
 class MainWindow {
@@ -74,6 +79,9 @@ private:
     void drawBody();
     void drawEmptyState(ImVec2 origin, ImVec2 size);
     void drawSpectrumArea(ImVec2 origin, ImVec2 size);
+    void drawAircraftArea(ImVec2 origin, ImVec2 size);
+    // The tab strip; returns its height.
+    float drawTabs(ImVec2 origin, float width);
     void drawStatusBar();
     void drawDevicePopup();
     void drawGainPopup();
@@ -93,6 +101,14 @@ private:
     MainWindowServices m_services;
     FrequencyDisplay m_frequency;
     SpectrumView m_spectrum;
+    AircraftView m_aircraftView;
+    adsb::AircraftStore m_aircraft;
+    enum class Tab { Spectrum, Aircraft };
+    Tab m_tab = Tab::Spectrum;
+    bool m_wasAdsbActive = false;
+    // Station location being edited in Settings.
+    double m_stationLat = 0.0;
+    double m_stationLon = 0.0;
 
     // This frame's view of the receiver.
     device::ReceiverStatus m_status;

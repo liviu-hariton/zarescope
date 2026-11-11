@@ -207,6 +207,9 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     services.recordingsFolder = recordings;
     services.chooseRecording = [recordings] { return platform::chooseRecordingToOpen(recordings); };
     services.versionText = ZARESCOPE_VERSION;
+    if (options.station) {
+        services.station = adsb::LatLon{options.station->first, options.station->second};
+    }
     if (auto presets = device::loadPresets(paths.resources / "presets.json", error)) {
         services.presets = std::move(*presets);
     } else {

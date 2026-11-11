@@ -117,6 +117,11 @@ MainWindow::MainWindow(const theme::DesignTokens& tokens, const Typography& typo
                        MainWindowServices services)
     : m_ui(tokens, typography), m_services(std::move(services)), m_spectrum(tokens) {
     m_services.receiver->setTraceSmoothing(m_traceSmoothing);
+    m_aircraft.setStation(m_services.station);
+    if (m_services.station) {
+        m_stationLat = m_services.station->latDeg;
+        m_stationLon = m_services.station->lonDeg;
+    }
 }
 
 bool MainWindow::wantsContinuousFrames() const {
@@ -132,6 +137,21 @@ void MainWindow::pullData() {
     if (receiver.latestTrace(m_trace)) {
         m_spectrum.setTrace(m_trace);
     }
+    // ADS-B: fold the decoded messages into the aircraft store.
+    // Aircraft age by arrival time (now), not by the samples' timestamps: a
+    // replayed recording would otherwise expire everything on arrival. Live,
+    // the two are the same.
+    const auto now = adsb::Clock::now();
+    receiver.drainAdsb(
+        [this, now](const device::AdsbMessage& m) { m_aircraft.update(m.message, now); });
+    m_aircraft.expire(now);
+    // When the source becomes ready for ADS-B (the preset, or a 1090 MHz
+    // recording), show the aircraft. Only on that change, never against
+    // the user's own choice afterwards.
+    if (m_status.adsbActive && !m_wasAdsbActive) {
+        m_tab = Tab::Aircraft;
+    }
+    m_wasAdsbActive = m_status.adsbActive;
 
     // A newly opened source: the VFO starts on its centre frequency.
     const bool running = m_status.state == ReceiverState::Running;
@@ -185,6 +205,10 @@ void MainWindow::setMode(dsp::DemodMode mode) {
 }
 
 void MainWindow::applyPreset(const device::Preset& preset) {
+    if (preset.sampleRateSps != 0 && m_status.isDevice &&
+        preset.sampleRateSps != m_status.deviceSettings.sampleRateSps) {
+        m_services.receiver->setSampleRate(preset.sampleRateSps);
+    }
     setMode(preset.mode);
     if (preset.bandwidthHz > 0.0) {
         m_demod.bandwidthHz = preset.bandwidthHz;
@@ -400,7 +424,14 @@ void MainWindow::drawBody() {
     const ImVec2 contentOrigin(origin.x, origin.y + bannerHeight);
     const ImVec2 contentSize(size.x, size.y - bannerHeight);
     if (m_status.state == ReceiverState::Running) {
-        drawSpectrumArea(contentOrigin, contentSize);
+        const float tabs = drawTabs(contentOrigin, contentSize.x);
+        const ImVec2 areaOrigin(contentOrigin.x, contentOrigin.y + tabs);
+        const ImVec2 areaSize(contentSize.x, contentSize.y - tabs);
+        if (m_tab == Tab::Aircraft) {
+            drawAircraftArea(areaOrigin, areaSize);
+        } else {
+            drawSpectrumArea(areaOrigin, areaSize);
+        }
     } else {
         drawEmptyState(contentOrigin, contentSize);
     }
@@ -441,43 +472,96 @@ void MainWindow::drawEmptyState(ImVec2 origin, ImVec2 size) {
     }
 }
 
-void MainWindow::drawSpectrumArea(ImVec2 origin, ImVec2 size) {
+float MainWindow::drawTabs(ImVec2 origin, float width) {
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     const float pad = m_ui.spacing("16");
     const float tabHeight = m_ui.size("control") + m_ui.spacing("8");
-
-    // Tab strip: one tab for now, marked by the 2-px accent "horizon rule".
-    const std::string_view tab = m_ui.tr(StringId::TabSpectrum);
-    const float tabWidth =
-        m_ui.drawTextCentered(drawList, TypeRole::Label, origin.x + pad, origin.y, tabHeight,
-                              m_ui.color("text/primary"), tab);
-    const float rule = m_ui.tokens().border("focus").value_or(2.0F);
     drawList.AddRectFilled(ImVec2(origin.x, origin.y + tabHeight - m_ui.border()),
-                           ImVec2(origin.x + size.x, origin.y + tabHeight),
+                           ImVec2(origin.x + width, origin.y + tabHeight),
                            m_ui.color("border/subtle"));
-    drawList.AddRectFilled(ImVec2(origin.x + pad, origin.y + tabHeight - rule),
-                           ImVec2(origin.x + pad + tabWidth, origin.y + tabHeight),
-                           m_ui.color("accent"));
 
-    // FFT information, right-aligned; opens the FFT settings.
-    const double binHz =
-        m_status.source.sampleRateSps / static_cast<double>(std::max<size_t>(m_status.fftSize, 1));
-    const std::string binText = binHz >= 1000.0 ? std::format("{:.2f} kHz", binHz / 1000.0)
-                                                : std::format("{:.0f} Hz", binHz);
-    const std::string info = m_ui.trf(StringId::FftInfo, m_status.fftSize, binText);
-    const float infoWidth = m_ui.buttonWidth(info, Icon::ChevronDown);
-    const ImVec2 infoPos(origin.x + size.x - pad - infoWidth,
-                         origin.y + (tabHeight - m_ui.size("control")) * 0.5F);
-    if (m_ui.button("##fft", infoPos, info, ButtonKind::Secondary, Icon::ChevronDown)) {
-        m_openFft = true;
-        m_fftAnchor = ImVec2(infoPos.x + infoWidth, origin.y + tabHeight);
+    // Tabs: label style, the active one in text/primary with the 2-px
+    // accent "horizon rule" underneath (DESIGN.md §4–5).
+    const std::string aircraftLabel = m_aircraft.aircraft().empty()
+                                          ? cstr(m_ui.tr(StringId::TabAircraft))
+                                          : cstr(m_ui.tr(StringId::TabAircraft)) + " · " +
+                                                std::to_string(m_aircraft.aircraft().size());
+    const std::array<std::pair<Tab, std::string>, 2> tabs{{
+        {Tab::Spectrum, cstr(m_ui.tr(StringId::TabSpectrum))},
+        {Tab::Aircraft, aircraftLabel},
+    }};
+    const float rule = m_ui.tokens().border("focus").value_or(2.0F);
+    float x = origin.x + pad;
+    for (const auto& [tab, label] : tabs) {
+        const float w = m_ui.textSize(TypeRole::Label, label).x;
+        ImGui::SetCursorScreenPos(ImVec2(x - m_ui.spacing("8"), origin.y));
+        ImGui::PushID(static_cast<int>(tab));
+        if (ImGui::InvisibleButton("##tab", ImVec2(w + 2.0F * m_ui.spacing("8"), tabHeight))) {
+            m_tab = tab;
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        ImGui::PopID();
+        const bool active = m_tab == tab;
+        m_ui.drawTextCentered(drawList, TypeRole::Label, x, origin.y, tabHeight,
+                              m_ui.color(active || hovered ? "text/primary" : "text/secondary"),
+                              label);
+        if (active) {
+            drawList.AddRectFilled(ImVec2(x, origin.y + tabHeight - rule),
+                                   ImVec2(x + w, origin.y + tabHeight), m_ui.color("accent"));
+        }
+        x += w + m_ui.spacing("24");
     }
 
-    const ImVec2 viewPos(origin.x, origin.y + tabHeight + m_ui.spacing("8"));
-    const ImVec2 viewSize(size.x, size.y - tabHeight - m_ui.spacing("8"));
-    if (auto tuned = m_spectrum.draw(m_ui, viewPos, viewSize, vfo())) {
+    // FFT information, right-aligned on the spectrum tab; opens its settings.
+    if (m_tab == Tab::Spectrum) {
+        const double binHz = m_status.source.sampleRateSps /
+                             static_cast<double>(std::max<size_t>(m_status.fftSize, 1));
+        const std::string binText = binHz >= 1000.0 ? std::format("{:.2f} kHz", binHz / 1000.0)
+                                                    : std::format("{:.0f} Hz", binHz);
+        const std::string info = m_ui.trf(StringId::FftInfo, m_status.fftSize, binText);
+        const float infoWidth = m_ui.buttonWidth(info, Icon::ChevronDown);
+        const ImVec2 infoPos(origin.x + width - pad - infoWidth,
+                             origin.y + (tabHeight - m_ui.size("control")) * 0.5F);
+        if (m_ui.button("##fft", infoPos, info, ButtonKind::Secondary, Icon::ChevronDown)) {
+            m_openFft = true;
+            m_fftAnchor = ImVec2(infoPos.x + infoWidth, origin.y + tabHeight);
+        }
+    }
+    return tabHeight + m_ui.spacing("8");
+}
+
+void MainWindow::drawSpectrumArea(ImVec2 origin, ImVec2 size) {
+    if (auto tuned = m_spectrum.draw(m_ui, origin, size, vfo())) {
         tuneTo(*tuned);
     }
+}
+
+void MainWindow::drawAircraftArea(ImVec2 origin, ImVec2 size) {
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    const float pad = m_ui.spacing("16");
+    const ImVec2 inner(origin.x + pad, origin.y);
+    const ImVec2 innerSize(size.x - 2.0F * pad, size.y - pad);
+    if (m_aircraft.aircraft().empty()) {
+        // Explain what's needed, and offer to set it up.
+        const std::string_view text =
+            m_status.adsbActive ? m_ui.tr(StringId::AdsbListening) : m_ui.tr(StringId::AdsbHint);
+        const float measure = std::min(kMeasurePx, innerSize.x);
+        const ImVec2 textSize = m_ui.textSize(TypeRole::Body, text, measure);
+        ImVec2 at(inner.x + (innerSize.x - measure) * 0.5F, inner.y + innerSize.y * 0.35F);
+        m_ui.drawText(drawList, TypeRole::Body, at, m_ui.color("text/secondary"), text, measure);
+        if (!m_status.adsbActive && m_status.isDevice) {
+            at.y += textSize.y + m_ui.spacing("16");
+            if (m_ui.button("##tuneAdsb", at, m_ui.tr(StringId::TuneAdsb), ButtonKind::Primary)) {
+                for (const auto& preset : m_services.presets) {
+                    if (preset.id == "adsb") {
+                        applyPreset(preset);
+                    }
+                }
+            }
+        }
+        return;
+    }
+    m_aircraftView.draw(m_ui, inner, innerSize, m_aircraft);
 }
 
 // --- Status bar ---------------------------------------------------------------------
@@ -925,6 +1009,19 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
     ImGui::Separator();
     // Language names are written in their own language, so each is
     // recognisable whatever the current one is.
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::StationLabel)).c_str());
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    ImGui::InputDouble(cstr(m_ui.tr(StringId::LatitudeLabel)).c_str(), &m_stationLat, 0.0, 0.0,
+                       "%.4f");
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    ImGui::InputDouble(cstr(m_ui.tr(StringId::LongitudeLabel)).c_str(), &m_stationLon, 0.0, 0.0,
+                       "%.4f");
+    m_stationLat = std::clamp(m_stationLat, -90.0, 90.0);
+    m_stationLon = std::clamp(m_stationLon, -180.0, 180.0);
+    if (ImGui::Button(cstr(m_ui.tr(StringId::UseLocation)).c_str())) {
+        m_aircraft.setStation(adsb::LatLon{m_stationLat, m_stationLon});
+    }
+    ImGui::Separator();
     ImGui::TextUnformatted(cstr(m_ui.tr(StringId::LanguageLabel)).c_str());
     if (ImGui::RadioButton("English", state.language == Language::English)) {
         state.language = Language::English;
