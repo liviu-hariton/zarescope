@@ -2,7 +2,9 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
+> **Status: M3, aircraft.** ADS-B is decoded at 1090 MHz and shown in a table and on a radar.
+>
+> **M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
 > - Listen to wideband FM, narrowband FM or AM, with squelch and presets.
 > - Tune by typing, scrolling or clicking.
 > - Record raw IQ.
@@ -33,6 +35,9 @@ open build/Zarescope.app --args --theme light
 # no stick? write a synthetic FM-band recording and play it:
 build/tools/zarescope-synth /tmp/fm.cu8 20
 open build/Zarescope.app --args --open /tmp/fm.cu8
+# or six aircraft around a station, on the radar:
+build/tools/zarescope-synth /tmp/adsb.cu8 30 --adsb --station 44.4268,26.1025
+open build/Zarescope.app --args --open /tmp/adsb.cu8 --station 44.4268,26.1025
 ```
 
 Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
@@ -56,7 +61,9 @@ find src tests -name '*.cpp' -o -name '*.h' -o -name '*.mm' | xargs xcrun clang-
 ```
 src/app/            main() and the frame loop
 src/device/         sample sources (stick, file), the receiver pipeline, IQ recorder
-src/dsp/            FFT, spectrum analyser, lock-free queues
+src/dsp/            FFT, spectrum analyser, audio chain, lock-free queues
+src/decoders/adsb/  Mode S / ADS-B: CRC, CPR, demodulator, aircraft store
+src/audio/          sound output (miniaudio)
 src/ui/             the Dear ImGui screens, fonts, strings (EN + RO)
 src/ui/theme/       design tokens → Dear ImGui style
 src/platform/       small interfaces; macos/ holds Metal and the macOS paths

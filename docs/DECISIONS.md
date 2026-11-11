@@ -211,3 +211,23 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - The stick's clock and the sound card's never agree, so the fill drifts; skipping keeps the delay between waterfall and sound short.
   - Opening lazily means the app never holds the sound device unless asked to.
 - **Rejected.** Adaptive resampling to track the clock drift: better, but more complex. It is worth revisiting if the skips become audible.
+
+## 2026-11-11 — ADS-B decoding: our own decoder, at 2 MS/s
+
+- **Decision.**
+  - The Mode S demodulator and decoder are Zarescope's own (M3), using the classic 2 MS/s method: two samples per bit, comparing the halves of each microsecond.
+  - Decoding runs on the DSP thread whenever the source is at 2 MS/s with 1090 MHz within 250 kHz of the centre.
+  - The ADS-B preset sets that up.
+- **Why.**
+  - At 2 MS/s each 0.5 µs pulse is one sample, so the method needs no interpolation.
+  - It is well documented and cheap.
+  - Tying decoding to the source's setup means recordings decode too.
+- **Rejected.**
+  - Embedding readsb: its licence is compatible, but the brief asks for our own decoder.
+  - 2.4 MS/s with phase tracking: better weak-signal performance, worth adding later.
+
+## 2026-11-11 — Aircraft age by arrival time
+
+- **Decision.** The UI hands messages to the `AircraftStore` stamped with the time they arrived, not the samples' timestamp.
+- **Why.** A replayed recording carries its original times, so expiry would remove every aircraft on arrival. Live, the two times are the same.
+- **Rejected.** A replay clock in the store: more state for no visible gain.

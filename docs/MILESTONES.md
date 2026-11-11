@@ -100,3 +100,30 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 - Stereo FM (the 19 kHz pilot and the L−R subcarrier): mono for now.
 - The band edges can't be dragged; the width is set in the Sound popover.
 - Sound is not tested through the receiver in CTest, because tests must not play audio or need a sound card. The demodulator is tested directly.
+
+## M3 — ADS-B (1090 MHz) 🟡 (built and tested on published test messages and synthetic IQ; live aircraft wait for the stick)
+
+- [x] The decoder, written from scratch (no readsb). Steps:
+  1. magnitude at 2 MS/s;
+  2. preamble detection;
+  3. 56- and 112-bit Mode S messages;
+  4. CRC-24 with single-bit correction;
+  5. DF17/DF18 content: identification (callsign), airborne position (CPR global from an even/odd pair, local against the last fix or the station), velocity (ground speed and track, or airspeed and heading; vertical rate), altitude (25-ft and Gillham).
+- [x] `AircraftStore`: active aircraft expire after 60 s; short position trails; bad-decode jumps are rejected.
+- [x] UI: the Aircraft tab, with a table (ICAO or callsign, altitude, speed, distance, last heard) and a radar centred on the station (range rings, trails, heading arrows).
+- [x] The ADS-B preset tunes 1090 MHz at 2 MS/s. Decoding runs whenever the source is set up like that, on the stick or on a recording.
+- [x] `zarescope-synth --adsb` writes a demo recording with six aircraft.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| Tests pass on test vectors (callsign, position, altitude) | ✅ `test_adsb.cpp`, from "The 1090 MHz Riddle": KLM1023; 52.2572° N 3.91937° E at 38 000 ft (global and local); both velocity subtypes |
+| On a recorded 1090 MHz IQ file, aircraft appear | ✅ on synthetic recordings: `test_receiver.cpp` end to end, and the radar on screen (six aircraft from `zarescope-synth --adsb`). A real recording comes with the stick. |
+| Live, aircraft appear on the radar | ⏳ waits for the stick and an antenna that sees the sky |
+
+**Left for later.**
+
+- **Station location.** It is set in Settings or with `--station`, but not saved yet; persistence comes with Settings (M6).
+- **Other downlink formats.** DF0/4/5/16/20/21 (address-overlaid parity) and surface positions are not decoded yet.
+- **Demodulation quality.** The demodulator is the classic 2 MS/s pulse comparison. Phase-corrected or 2.4 MS/s demodulation (as in readsb) would catch more weak messages.
