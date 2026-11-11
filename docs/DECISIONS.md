@@ -95,3 +95,84 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Decision.** The stick bought for development is an RTL-SDR Blog V4 (R828D). It hasn't arrived yet; its authenticity is checked on arrival. The code still assumes no model, and the V3 stays the recommendation for users, because the V4 is out of production.
 - **Why.** A V4 turned up for sale after the end-of-life notice. The V4 needs the RTL-SDR Blog fork of librtlsdr, which the brief already requires.
 - **Rejected.** Changing the reference stick in the code: the earlier "assume no model" decision covers both.
+
+## 2026-11-11 — libusb is built from source, not taken from Homebrew
+
+- **Decision.** Build libusb 1.0.30 statically through the libusb project's own CMake build (libusb-cmake v1.0.30-0), pinned by hash.
+- **Why.** Homebrew's static `libusb-1.0.a` targets the newest macOS only (the linker warned "built for macOS 26, linking for 14"). A bundle carrying it could fail on older Macs, which would break M7's acceptance. Building it ourselves also removes a Homebrew dependency.
+- **Rejected.**
+  - Homebrew's dylib: the same minimum-version problem, plus bundling.
+  - Raising the deployment target: excludes users for no reason.
+
+## 2026-11-11 — The receive chain: blocks, queues and threads
+
+- **Decision.**
+  - **Blocks and queues:**
+    - Blocks are 64 KiB (32 768 complex samples, 13.7 ms at 2.4 MS/s), a multiple of librtlsdr's 512-byte USB granularity.
+    - Source → DSP uses a 128-slot SPSC queue (about 1.7 s of slack).
+    - DSP → UI uses a 64-slot queue of rows, plus a triple buffer for the trace.
+  - **Threads:**
+    - A control thread runs every librtlsdr control call.
+    - The recorder has its own writer thread.
+  - **Tuning coalesces:** only the newest requested frequency is sent.
+- **Why.**
+  - **Hand-offs:** SPSC queues and a triple buffer need neither locks nor allocation, as the sample path requires (ARCHITECTURE.md).
+  - **Slack:** 1.7 s absorbs a busy DSP thread or a slow frame without dropping samples.
+  - **USB calls:** control transfers take milliseconds to tens of milliseconds, so they must not run on the UI thread.
+  - **Disk:** a stalled disk must not stall the DSP chain.
+  - **Retunes:** scrolling over the frequency would otherwise queue dozens of USB retunes.
+- **Rejected.**
+  - A mutex-protected ring: contention on the hot path.
+  - Writing recordings on the DSP thread: one slow write would drop samples.
+
+## 2026-11-11 — A retune ends a recording
+
+- **Decision.** If a block arrives with a different frequency or sample rate than the recording's, the recording ends there, and the UI says so.
+- **Why.** A `.cu8` file has one sidecar, so one frequency and one rate. Splitting into several files silently would surprise; mixing frequencies in one file would corrupt it for SatDump (M5).
+- **Rejected.**
+  - Refusing to tune while recording: it blocks the user for a reason they can't see.
+  - Splitting into numbered files.
+
+## 2026-11-11 — The waterfall uses Dear ImGui's user textures
+
+- **Decision.**
+  - **Texture:** the waterfall is a 2048 × 1024 RGBA ring texture, an `ImTextureData` registered with `ImGui::RegisterUserTexture`.
+  - **Uploads:** each new row is uploaded alone with `ImTextureDataQueueUpload`, and the renderer backend (Metal today) updates the GPU copy.
+  - **Resampling:** FFT bins are max-resampled to 2048 columns.
+  - **Storage:** levels are stored at that width so a range change can repaint.
+- **Why.**
+  - The waterfall needs no graphics-API code, so a port only needs a `Renderer`.
+  - One-row uploads keep the GPU traffic at 8 KB per row.
+  - Max-resampling keeps narrow carriers visible at any FFT size.
+- **Risk.** `RegisterUserTexture` is marked experimental in ImGui 1.93. If it changes, the fallback is a small `TextureUploader` in `src/platform`.
+- **Rejected.**
+  - A Metal texture managed by hand: platform code in the UI.
+  - Re-uploading the whole texture each frame: 8 MB per frame.
+
+## 2026-11-11 — The spectrum uses ImPlot for the plot, with hand-drawn axes
+
+- **Decision.**
+  - ImPlot draws the trace (shaded fill and line), the grid and the plot area. Its tick labels are turned off.
+  - The dBFS labels, the frequency axis under the waterfall and the time labels are drawn by `SpectrumView`.
+  - ImPlot's colours come from tokens (`PlotTheme.cpp`).
+- **Why.** The spectrum and waterfall must share exact pixel columns, and the design puts the frequency axis below the waterfall. ImPlot's own axis gutter would shift the plot against the waterfall.
+- **Rejected.** Drawing the spectrum entirely by hand: ImPlot is the stack's choice and handles lines and fills well.
+
+## 2026-11-11 — The level range fits the signal at first
+
+- **Decision.** The first trace of each new source sets the waterfall's dBFS range:
+  - the floor 10 dB under the noise (its 20th percentile);
+  - the ceiling 5 dB over the strongest signal;
+  - both on 5-dB steps, at least 30 dB apart.
+
+  "Fit to signal" redoes it on demand. Retuning keeps the user's range.
+- **Why.** The design's default of −120…−20 dBFS suits no real stick. With an 8-bit RTL-SDR the noise per bin sits around −80 to −90 dBFS, so the default showed bright blue noise and a heavy fill.
+- **Rejected.**
+  - A fixed range tuned to one stick.
+  - Continuous automatic ranging: the picture would breathe.
+
+## 2026-11-11 — Hardware tests are a separate executable
+
+- **Decision.** Tests that need a stick are named `[hardware] …` and built as `zarescope_hardware_tests`, which CTest doesn't run.
+- **Why.** `ctest` must pass on any machine without hardware, and a separate binary can't be run by accident.
+- **Rejected.** Excluding test cases by doctest filter in CTest: easy to get wrong silently.

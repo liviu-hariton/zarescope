@@ -33,6 +33,40 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 - The language follows a setting that arrives in M6; English is shown until then.
 - clang-tidy hasn't been run yet; it needs `brew install llvm`.
 
-## M1 — Device, spectrum and waterfall
+## M1 — Device, spectrum and waterfall 🟡 (built and tested on recordings; live checks wait for the stick)
 
-Not started. The receiver is not here yet. Most of M1 can be built and tested on synthetic signals and on recorded IQ files (`FileSource`); the live check waits for the stick.
+- [x] Device: list sticks, open/close, frequency, sample rate (default 2.4 MS/s), gain (manual on the tuner's steps, or automatic), ppm. Bias-tee off by default, forced off on every open and close, and turned on only after an inline warning.
+- [x] Stick identity: the EEPROM's model claim against the tuner chip. A "Blog V4" that isn't an R828D is flagged as a likely counterfeit.
+- [x] Source thread → SPSC block queue → DSP thread → FFT with a Blackman-Harris window and averaging (configurable FFT size and trace smoothing).
+- [x] Spectrum (ImPlot) and waterfall (GPU texture updated one row at a time). The replay of a 2.4 MS/s recording draws at the display's rate at about 6 % CPU.
+- [x] Tuning:
+  - type the frequency;
+  - scroll or use the arrow keys over a digit;
+  - scroll over the spectrum or waterfall;
+  - click the spectrum or waterfall to tune there.
+- [x] `IqRecorder`: raw `cu8` plus a JSON sidecar (frequency, sample rate, UTC start, gain, ppm, device, sample count), written on its own thread.
+- [x] `FileSource`: plays a recording through exactly the same chain; the app opens one with the system dialog or `--open`.
+- [x] `zarescope-synth` writes a synthetic FM-band recording for working without a stick.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| A synthetic tone at a known offset peaks in the right FFT bin | ✅ `test_dsp.cpp` (four offsets, level within 0.05 dB) |
+| A recorded file replays identically | ✅ `test_iq_files.cpp` (byte for byte, through the recorder and back) |
+| With the stick connected, the FM band appears correctly | ⏳ waits for the RTL-SDR Blog V4. Then run `build/tests/zarescope_hardware_tests` and look at 88–108 MHz. |
+
+**When the stick arrives.**
+
+1. Run `build/tests/zarescope_hardware_tests`. It checks:
+   - the identity verdict, i.e. whether the V4 is genuine;
+   - the streaming rate and dropped blocks;
+   - a live spectrum.
+2. Open the stick in the app at 100 MHz and check that the FM stations show up and line up with known frequencies.
+3. Check the ppm correction against a known carrier.
+
+**Left for later.**
+
+- Errors that come from the device layer (librtlsdr failures) are English text inside the translated banner; they get StringIds with Settings (M6).
+- The line icons are drawn with primitives. The 24-grid SVG set in `design/icons` needs an SVG rasterizer (nanosvg), planned for when more icons are needed.
+- The frequency display shows the integer MHz part at its natural width (98 vs 100), so the highest digits appear only when the value needs them.

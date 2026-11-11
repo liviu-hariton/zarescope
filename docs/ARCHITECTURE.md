@@ -1,86 +1,158 @@
 # Zarescope architecture
 
-This describes what exists today (M0). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+This describes what exists today (end of M1). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+
+## Threads and data flow
 
 ```
-┌─────────────────────────── src/app ───────────────────────────┐
-│  main.cpp   command line (--theme)                            │
-│  App        start-up, frame loop, shutdown                    │
-└───────┬───────────────────────────┬───────────────────────────┘
-        │                           │
-┌───────▼──────── src/ui ───────┐ ┌─▼────────── src/platform ─────────┐
-│ MainWindow  top bar, body,    │ │ Renderer  (interface)             │
-│             status bar        │ │ AppPaths  (interface)             │
-│ Typography  fonts, type scale │ │ macos/MetalRenderer.mm            │
-│ Strings     EN + RO table     │ │ macos/MacAppPaths.mm              │
-│ LogoMark    vector logo       │ └───────────────────────────────────┘
-│ Clock       UTC / local text  │
-│ theme/ImGuiTheme  tokens →    │
-│                   ImGuiStyle  │
-└───────┬───────────────────────┘
-┌───────▼──── src/ui/theme (no ImGui) ───┐
-│ DesignTokens  loads and validates      │
-│ design/tokens/zarescope.tokens.json    │
-└────────────────────────────────────────┘
+                         control thread (Receiver)
+                         opens/closes sources, every librtlsdr control call
+                                     │
+ ┌──────────── source thread ────────▼──────┐
+ │ RtlSdrSource: rtlsdr_read_async callback │
+ │ FileSource:   reads a .cu8, real-time    │
+ └───────────────┬──────────────────────────┘
+                 │ SampleBlock (64 KiB cu8 + frequency, rate, UTC time)
+                 ▼ SpscSlots, 128 slots ≈ 1.7 s, lock-free, preallocated
+ ┌──────────── DSP thread (Receiver) ───────┐
+ │ IqRecorder::offer ──▶ recorder queue ──▶ writer thread ──▶ .cu8 + .json
+ │ SpectrumAnalyzer: window, FFT, average   │
+ └───────┬──────────────────────┬───────────┘
+         │ every row            │ smoothed trace (latest only)
+         ▼ SpscSlots (64)       ▼ TripleBuffer
+ ┌──────────── UI thread ───────────────────┐
+ │ MainWindow → SpectrumView (waterfall texture, spectrum plot) │
+ │ posts commands to the Receiver; never waits on it            │
+ └──────────────────────────────────────────┘
 ```
+
+These rules hold:
+
+- **The UI thread never blocks.** It only posts commands, which return at once, and reads results through lock-free queues. A short status copy is guarded by a mutex that no thread holds across I/O.
+- **The DSP path doesn't allocate.** After setup it never allocates; only a change of FFT size rebuilds the analyser.
+- **Errors travel as data.** They are reported as status (`ReceiverStatus::error`, `RecorderStatus::error`), never as exceptions crossing threads.
 
 ## Libraries
 
 | Target | Holds | Depends on |
 |---|---|---|
+| `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, `SignalGenerator`, cu8 conversion | KissFFT |
+| `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Receiver` | `zarescope_dsp`, librtlsdr (static), libusb (static), nlohmann/json |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
-| `zarescope_ui` | screens, style, fonts, strings | `zarescope_theme`, Dear ImGui |
-| `zarescope_platform` | Metal renderer, macOS paths | Dear ImGui's Metal backend, Cocoa |
+| `zarescope_ui` | the screens, the ImGui and ImPlot themes, fonts, strings, formats | `zarescope_theme`, `zarescope_device`, Dear ImGui, ImPlot |
+| `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
 | `Zarescope` | the `.app` bundle | all of the above |
-| `zarescope_tests` | doctest tests | `zarescope_ui` |
+| `zarescope_tests` | doctest tests, run by CTest | `zarescope_ui` |
+| `zarescope_hardware_tests` | tests that need a stick, run by hand | `zarescope_device` |
+| `zarescope-synth` | writes a synthetic FM-band recording | `zarescope_device` |
 
-Dependencies point one way. Nothing outside `src/platform/macos` includes an Apple header or uses `#ifdef __APPLE__`; a Linux or Windows port adds `src/platform/<os>/` with its own `Renderer` and `AppPaths`.
+Dependencies point one way. Nothing outside `src/platform/macos` includes an Apple header or uses `#ifdef __APPLE__`. Every third-party library is linked statically, so the app needs only macOS itself.
 
-## Start-up
+## The receive chain (`src/device`, `src/dsp`)
 
-`App`'s constructor runs these steps in order. Any failure throws, and `main()` prints the reason and exits with status 1.
+- **SampleSource.** It produces `SampleBlock`s on its own thread.
+  - **`RtlSdrSource`** wraps librtlsdr from the RTL-SDR Blog fork.
+    - Its reader thread runs `rtlsdr_read_async`; the callback copies each 64 KiB USB transfer into the block queue.
+    - Controls cover tuning, sample rate, gain (automatic, or the nearest tuner step), ppm and bias-tee.
+    - The bias-tee is forced off on every open and close.
+  - **`FileSource`** plays a recording.
+    - **Normal playback:** at the recorded rate, looping, with timestamps continuing from the recording's start.
+    - **In tests:** once, as fast as the consumer allows.
+- **Receiver** ties it together.
+  - **Control thread.** Runs the command queue. Opening a stick, every USB control call and stopping all happen there.
+  - **Tuning coalesces.** Only the newest requested frequency is applied, so scrolling over the frequency never queues dozens of USB retunes.
+  - **DSP thread.**
+    - Hands each block to the recorder.
+    - Feeds the analyser.
+    - Queues every finished row for the waterfall.
+    - Keeps an exponentially smoothed trace for the spectrum line.
+  - **Retunes.** A change of frequency or rate in the blocks resets the analyser and the trace.
+- **SpectrumAnalyzer.** The pipeline is:
+  1. convert cu8 to complex float;
+  2. apply a 4-term Blackman-Harris window (periodic);
+  3. run the FFT;
+  4. take |X|² and average over the frames of one row (`framesPerRow` follows the sample rate and a 30 rows/s target);
+  5. convert to dBFS (a full-scale tone reads 0 dBFS) and FFT-shift, so −fs/2 is on the left.
+- **IqRecorder.**
+  - The DSP thread `offer()`s blocks without waiting.
+  - The recorder's own writer thread creates the folder and files, writes, and finally rewrites the sidecar with the sample count.
+  - A block with another frequency or rate ends the recording.
+  - A seq_cst handshake (`m_offersInFlight` against `m_recording`) guarantees the final drain sees every block.
+- **DeviceIdentity.** Compares the model claimed in the EEPROM's USB strings (`RTLSDRBlog` / `Blog V4`, `Blog V4L`, `Blog V3`, matched exactly as librtlsdr does) with the tuner read over I²C. A V4 must report an R828D; anything else is flagged as a mismatch, the usual sign of a counterfeit.
 
-1. GLFW, then the window. The renderer sets its window hints first (Metal: no OpenGL context).
-2. The ImGui context: keyboard navigation and docking on, no `imgui.ini` file.
-3. `AppPaths`: the bundle's `Contents/Resources`.
-4. Design tokens from `Resources/zarescope.tokens.json`. `DesignTokens::fromJson` refuses a file that:
-   - is missing a section;
-   - has a colour that isn't `#RRGGBB`;
-   - defines a token in one theme and not the other;
-   - maps an ImGui colour to a token that doesn't exist;
-   - has a waterfall LUT that isn't exactly 256 entries.
-5. Fonts from `Resources/fonts`, then the type scale (`Typography`).
-6. The theme: `applyTheme` writes every `ImGuiCol` colour and the style values. ImGuiCol entries newer than the token file borrow the token of their closest neighbour (`kColorFallbacks`), so colours still come only from the tokens.
-7. The GLFW and Metal backends.
+## The UI (`src/ui`)
 
-Teardown runs in reverse in `App::State`'s destructor. That destructor also runs when the constructor throws halfway.
+- **UiKit** is the design system at the point of use. It covers:
+  - colours, sizes and type by token name;
+  - strings by `StringId` (EN and RO);
+  - the shared widgets: buttons, status chips, segmented control, banners and a few line icons.
+- **MainWindow** is the fixed layout of DESIGN.md §6.
+  - **Top bar:** logo, frequency display, gain, receiver chip, LIVE/REPLAY chip, record button and theme switch.
+  - **Banner:** recording, or a notice or error.
+  - **Body:** the spectrum area, or the empty state.
+  - **Status bar.**
+  - **Popovers:** receiver, gain and FFT settings.
+- **FrequencyDisplay** tunes digit by digit:
+  - scroll over a digit;
+  - click a digit, then use ↑ ↓ ← →;
+  - type digits.
 
-## Frame loop
+  The arrow keys are claimed with `SetKeyOwner` while editing, so ImGui's keyboard navigation doesn't take them.
+- **SpectrumView** draws the spectrum and the waterfall.
+  - **Spectrum.** ImPlot draws the trace and the grid. The axis labels are drawn by hand so the spectrum and the waterfall share exact pixel columns.
+  - **Waterfall texture.** A 2048 × 1024 RGBA ring, registered with `ImGui::RegisterUserTexture`. Each new row is written above the previous one and uploaded alone with `ImTextureDataQueueUpload`, and the renderer backend updates the GPU texture. No graphics-API code is involved.
+  - **Row resampling.** FFT bins are reduced to the texture width by taking the strongest bin per column, so narrow carriers survive.
+  - **Level range.** It fits the first trace of each source (`suggestRange`). Changing it repaints the texture from the stored levels.
+- **Themes.** `applyTheme` (ImGui) and `applyPlotTheme` (ImPlot) map every colour slot to a token, and the native title bar follows through `platform::setWindowAppearance`.
 
-- **Idle.** `glfwWaitEventsTimeout(0.25 s)` sleeps when nothing happens, so an idle window costs no CPU. It still wakes four times a second to tick the clock.
-- **After input.** The loop polls for 500 ms after any input, paced by the display's vsync, so hover states and tooltips show without delay. When live data streams in (M1), the loop will draw continuously.
-- **Drawing a frame.** `Renderer::renderFrame` acquires a Metal drawable, then calls back into the app for the whole ImGui frame (`NewFrame` → `MainWindow::draw` → `Render`), then encodes and presents.
-- **Theme switch.** When the user switches theme, `applyTheme` runs again with the other variant before the next frame. The whole token set is swapped, so nothing from the old theme remains. `platform::setWindowAppearance` makes the native title bar follow too (on macOS, `NSWindow.appearance`).
+## Start-up and frame loop
 
-## Fonts
+`App`'s constructor runs these steps in order:
 
-- **Families.** Inter (400/500/600) and JetBrains Mono NL (400/500), static TTFs in `resources/fonts/`.
-- **Glyph loading.** Dear ImGui ≥ 1.92 rasterizes glyphs on demand at the size and pixel density they're drawn at. Fonts are loaded once, with no fixed size and no glyph ranges, and stay sharp on Retina screens.
-- **Thin space.** JetBrains Mono lacks U+2009 and U+202F, which the number formats need (`137.900 000 MHz`, `36 000 ft`). Those two glyphs are merged in from Inter of the same weight.
-- **Glyph test.** A test checks that every glyph the design lists is present in every font, including Romanian Ș ș Ț ț with the comma below.
+1. GLFW and the window;
+2. the ImGui and ImPlot contexts;
+3. the paths, the tokens and the fonts;
+4. the themes;
+5. the `Receiver`;
+6. the `MainWindow`, given the receiver, the recordings folder (`~/Library/Application Support/Zarescope/recordings`) and the file dialog;
+7. the backends.
 
-## UI text
+Any failure throws, and `main()` prints the reason.
 
-All UI text comes from `ui/Strings.cpp`: one `StringId` per string, English and Romanian side by side. A `static_assert` fails the build if a row is missing or out of order, and a test rejects the cedilla forms Ş ş Ţ ţ in Romanian. M0 shows English; the language setting arrives with Settings (M6).
+Teardown order matters and lives in `App::State`'s destructor:
+
+1. receiver threads;
+2. renderer (releases GPU textures);
+3. window (unregisters the waterfall texture, which still needs the ImGui context);
+4. ImPlot;
+5. GLFW backend;
+6. ImGui;
+7. the window, then GLFW.
+
+How often the loop draws:
+
+- **Idle:** the loop sleeps until input, waking four times a second for the clock.
+- **After input:** it draws at the display's rate for half a second.
+- **While live:** it draws continuously whenever data is live or a recording runs.
 
 ## Tests
 
-`ctest --test-dir build --output-on-failure`. Each doctest case is a CTest test. ImGui runs headless (a context with no window), which is enough to check styles and fonts.
+`ctest --test-dir build --output-on-failure` runs 50 test cases with no stick, window or GPU. ImGui and ImPlot run headless.
 
 | File | Checks |
 |---|---|
-| `test_smoke.cpp` | the runner works; the version is `MAJOR.MINOR.PATCH` |
-| `test_design_tokens.cpp` | hex parsing; anchor values from DESIGN.md; both themes define the same tokens; colour expressions; the LUT matches `waterfall-lut.csv` and its luminance rises; broken files are refused; the colour pairs the shell draws meet WCAG AA |
-| `test_imgui_theme.cpp` | every style field and `ImGuiCol` maps in both themes; values land where the design says |
-| `test_typography.cpp` | the fonts load; every glyph the design needs is present; every type role maps to a shipped weight |
-| `test_strings_clock.cpp` | both languages are filled in; Romanian uses comma-below letters; the clock format |
+| `test_smoke.cpp` | the runner; the version format |
+| `test_design_tokens.cpp` | token parsing and validation; LUT against the CSV; WCAG AA for the pairs drawn |
+| `test_imgui_theme.cpp` | every ImGui and ImPlot colour maps in both themes; values land where the design says |
+| `test_typography.cpp` | fonts load; every glyph the design needs (incl. Ș ș Ț ț, thin spaces) is in every font |
+| `test_strings_clock.cpp` | both languages filled in; comma-below letters; matching `{}` placeholders; clock format |
+| `test_dsp.cpp` | SPSC queue across threads; window; FFT; cu8 conversion; **a tone peaks in the right bin at the right level** (M1 acceptance); split input gives identical rows |
+| `test_iq_files.cpp` | sidecar format; byte-exact playback; real-time pacing; **a recording replays identically** (M1 acceptance); a retune ends a recording |
+| `test_receiver.cpp` | the whole chain on recordings: rows, trace, FFT size changes, recording through the receiver; the stick identity rules |
+| `test_ui_format.cpp` | number formats; axis ticks; waterfall resampling, colouring and range fitting |
+
+`build/tests/zarescope_hardware_tests` needs a stick and is run by hand. It covers:
+
+- **identity:** what the stick claims and whether its tuner agrees;
+- **streaming:** that it streams at the requested rate without drops;
+- **spectrum:** a spectrum from the live receiver.

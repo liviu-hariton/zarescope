@@ -2,7 +2,7 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M0, the skeleton.** The app opens a Metal window with the Zarescope design system (dark and light themes, Inter and JetBrains Mono). It does not talk to a receiver yet; that arrives in M1. See [docs/MILESTONES.md](docs/MILESTONES.md).
+> **Status: M1, spectrum and waterfall.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall. You can tune by typing, scrolling or clicking, and record raw IQ. It has been built and tested on recordings; the live checks wait for the development stick. See [docs/MILESTONES.md](docs/MILESTONES.md).
 
 Zarescope only receives. It never transmits and never decodes encrypted or private communications.
 
@@ -25,7 +25,12 @@ ctest --test-dir build --output-on-failure
 open build/Zarescope.app
 # start in the light theme:
 open build/Zarescope.app --args --theme light
+# no stick? write a synthetic FM-band recording and play it:
+build/tools/zarescope-synth /tmp/fm.cu8 20
+open build/Zarescope.app --args --open /tmp/fm.cu8
 ```
+
+Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
 
 Run from a terminal to see start-up errors: `build/Zarescope.app/Contents/MacOS/Zarescope`.
 
@@ -45,12 +50,15 @@ find src tests -name '*.cpp' -o -name '*.h' -o -name '*.mm' | xargs xcrun clang-
 
 ```
 src/app/            main() and the frame loop
+src/device/         sample sources (stick, file), the receiver pipeline, IQ recorder
+src/dsp/            FFT, spectrum analyser, lock-free queues
 src/ui/             the Dear ImGui screens, fonts, strings (EN + RO)
 src/ui/theme/       design tokens → Dear ImGui style
 src/platform/       small interfaces; macos/ holds Metal and the macOS paths
 resources/fonts/    Inter and JetBrains Mono (SIL OFL 1.1, licences alongside)
 design/             the design system: spec, tokens, waterfall LUT, logo, icons
-tests/              doctest unit tests
+tests/              doctest unit tests; tests/hardware needs a stick
+tools/              developer tools (zarescope-synth)
 docs/               architecture, decisions, dependencies, file formats, milestones
 ```
 
