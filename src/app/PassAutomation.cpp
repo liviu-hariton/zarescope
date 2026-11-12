@@ -140,6 +140,7 @@ void PassAutomation::begin(const sat::RecordingPlan& plan, const device::Receive
         device::RtlSdrSettings settings;
         settings.centerFrequencyHz = plan.frequencyHz;
         settings.sampleRateSps = plan.sampleRateSps;
+        settings.ppm = m_config.ppm;
         m_receiver.openDevice(0, settings);
     }
 }

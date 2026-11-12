@@ -14,6 +14,10 @@
 #include "ui/Format.h"
 #include "ui/LogoMark.h"
 
+#include <nlohmann/json.hpp>
+
+#include <cmath>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -88,7 +92,6 @@ std::optional<StringId> presetName(std::string_view id) {
 // Defaults for a freshly opened stick: the FM broadcast band, 2.4 MS/s
 // (the M1 default), automatic gain.
 constexpr int64_t kDefaultFrequencyHz = 100'000'000;
-constexpr uint32_t kDefaultSampleRate = 2'400'000;
 
 // Begins a full-width, square, borderless bar or area. The style is pushed
 // only around BeginChild (where ImGui reads it), so it doesn't leak into
@@ -117,20 +120,49 @@ MainWindow::MainWindow(const theme::DesignTokens& tokens, const Typography& typo
                        MainWindowServices services)
     : m_ui(tokens, typography), m_services(std::move(services)), m_spectrum(tokens) {
     m_services.receiver->setTraceSmoothing(m_traceSmoothing);
-    if (m_services.initialTab == "aircraft") {
+    m_settings = m_services.settings;
+    m_savedSettings = m_settings;
+    // A first run opens on Discover; later runs on the spectrum.
+    m_tab = m_settings.discoverySeen ? Tab::Spectrum : Tab::Discover;
+    if (m_services.initialTab == "spectrum") {
+        m_tab = Tab::Spectrum;
+    } else if (m_services.initialTab == "aircraft") {
         m_tab = Tab::Aircraft;
     } else if (m_services.initialTab == "satellites") {
         m_tab = Tab::Satellites;
+    } else if (m_services.initialTab == "journal") {
+        m_tab = Tab::Journal;
+    } else if (m_services.initialTab == "discover") {
+        m_tab = Tab::Discover;
     }
+    // The command line's station wins for this run; otherwise the saved one.
     if (m_services.station) {
         m_stationLat = m_services.station->latDeg;
         m_stationLon = m_services.station->lonDeg;
         m_stationAlt = m_services.stationAltitudeM;
         applyStation();
+    } else if (m_settings.station) {
+        m_stationLat = m_settings.station->latDeg;
+        m_stationLon = m_settings.station->lonDeg;
+        m_stationAlt = m_settings.station->altitudeM;
+        applyStation();
+    }
+    m_minElevation = static_cast<float>(m_settings.minElevationDeg);
+    if (m_services.satellites != nullptr) {
+        m_services.satellites->setMinElevation(m_settings.minElevationDeg);
     }
 }
 
+void MainWindow::openDevice(uint32_t index) {
+    m_spectrum.clear();
+    m_services.receiver->openDevice(index,
+                                    device::RtlSdrSettings{.centerFrequencyHz = kDefaultFrequencyHz,
+                                                           .sampleRateSps = m_settings.defaultSampleRateSps,
+                                                           .ppm = m_settings.ppm});
+}
+
 void MainWindow::applyStation() {
+    m_settings.station = app::StationSetting{m_stationLat, m_stationLon, m_stationAlt};
     m_aircraft.setStation(adsb::LatLon{m_stationLat, m_stationLon});
     if (m_services.satellites != nullptr) {
         m_services.satellites->setStation(sat::Station{m_stationLat, m_stationLon, m_stationAlt});
@@ -245,6 +277,7 @@ void MainWindow::pullData() {
         notifyUpcomingPasses();
     }
     updateAutomation();
+    updateJournal();
 
     // A newly opened source: the VFO starts on its centre frequency.
     const bool running = m_status.state == ReceiverState::Running;
@@ -348,6 +381,101 @@ void MainWindow::draw(ShellState& state) {
     ImGui::PopStyleVar(2);
 
     ImGui::End();
+    saveSettingsIfChanged(state);
+}
+
+void MainWindow::saveSettingsIfChanged(const ShellState& state) {
+    m_settings.theme = state.variant == theme::ThemeVariant::Light ? "light" : "dark";
+    m_settings.language = state.language == Language::Romanian ? "ro" : "en";
+    m_settings.minElevationDeg = std::round(static_cast<double>(m_minElevation));
+    if (m_services.automation != nullptr) {
+        m_settings.autoRecord = m_automation.enabled;
+    }
+    if (m_tab == Tab::Discover) {
+        m_settings.discoverySeen = true;
+    }
+    if (m_settings != m_savedSettings && m_services.saveSettings) {
+        m_services.saveSettings(m_settings);
+        m_savedSettings = m_settings;
+    }
+}
+
+// Journal entries: each pass outcome (and its images), each recording the
+// user made, and each aircraft once per UTC day (updated when its callsign
+// arrives). Only posts to the journal's thread.
+void MainWindow::updateJournal() {
+    store::JournalService* journal = m_services.journal;
+    if (journal == nullptr) {
+        return;
+    }
+    m_journal = journal->snapshot();
+    const auto now = store::Clock::now();
+
+    if (const auto& last = m_automation.last; last && last->serial > m_journaledOutcome) {
+        m_journaledOutcome = last->serial;
+        store::JournalEvent pass;
+        pass.kind = store::EventKind::Pass;
+        pass.timeUtc = last->aos;
+        pass.title = last->satellite;
+        pass.detail = outcomeMessage(*last);
+        pass.path = last->ok ? std::string() : last->log.string();
+        pass.data = nlohmann::json{{"ok", last->ok},
+                                   {"images", last->images},
+                                   {"failure", static_cast<int>(last->failure)},
+                                   {"error", last->error},
+                                   {"folder", last->folder.string()}}
+                        .dump();
+        journal->add(pass);
+        if (last->ok) {
+            store::JournalEvent images = pass;
+            images.kind = store::EventKind::Images;
+            images.detail = std::to_string(last->images) + " PNG";
+            images.path = last->folder.string();
+            journal->add(images);
+        }
+    }
+
+    // A recording the user made, once it has finished cleanly.
+    if (!m_recording.path.empty() && m_recording.path != m_trackedRecording) {
+        m_trackedRecording = m_recording.path;
+        m_trackedByUser = userMayControl();  // a pass's recording is journaled as the pass
+        m_trackedDone = false;
+    }
+    if (!m_trackedDone && m_trackedByUser && m_recording.path == m_trackedRecording &&
+        m_recording.state == RecorderState::Idle && m_recording.error.empty() &&
+        m_recording.bytesWritten > 0) {
+        m_trackedDone = true;
+        store::JournalEvent recording;
+        recording.kind = store::EventKind::Recording;
+        recording.timeUtc = m_recording.startUtc;
+        recording.title = m_recording.path.filename().string();
+        recording.detail = formatBytes(m_recording.bytesWritten);
+        recording.path = m_recording.path.string();
+        journal->add(recording);
+    }
+
+    // Aircraft, one row per day.
+    const std::string day = std::format("{:%F}", std::chrono::floor<std::chrono::days>(now));
+    if (day != m_journalDay) {
+        m_journalDay = day;
+        m_journaledAircraft.clear();
+    }
+    for (const auto& [icaoKey, aircraft] : m_aircraft.aircraft()) {
+        const auto it = m_journaledAircraft.find(aircraft.icao);
+        if (it != m_journaledAircraft.end() && it->second == aircraft.callsign) {
+            continue;
+        }
+        m_journaledAircraft[aircraft.icao] = aircraft.callsign;
+        const std::string icao = std::format("{:06X}", aircraft.icao);
+        store::JournalEvent event;
+        event.kind = store::EventKind::Aircraft;
+        event.timeUtc = now;
+        event.title = aircraft.callsign.empty() ? icao : aircraft.callsign;
+        event.detail = "ICAO " + icao;
+        event.data = nlohmann::json{{"icao", icao}, {"callsign", aircraft.callsign}}.dump();
+        event.key = "aircraft:" + day + ":" + icao;
+        journal->add(event);
+    }
 }
 
 // --- Top bar ----------------------------------------------------------------------
@@ -399,13 +527,14 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
             m_openGain = true;
             m_gainAnchor = ImVec2(x, origin.y + height);
         }
+        UiKit::tooltip(m_ui.tr(StringId::TipGain));
         x += m_ui.buttonWidth(label, Icon::ChevronDown) + gap;
     }
     if (running) {
         const std::array<std::string_view, 4> modes{m_ui.tr(StringId::ModeOff), "WFM", "NFM", "AM"};
         int mode = static_cast<int>(m_demod.mode);
         if (m_ui.segmented("mode", ImVec2(x, controlY), modes.data(), 4, mode,
-                           m_ui.tr(StringId::ModeLabel))) {
+                           m_ui.tr(StringId::TipMode))) {
             setMode(static_cast<dsp::DemodMode>(mode));
         }
         x += m_ui.segmentedWidth(modes.data(), 4) + gap;
@@ -435,11 +564,13 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
                         !locked && m_recording.state != RecorderState::Finishing)) {
             toggleRecording();
         }
+        UiKit::tooltip(m_ui.tr(StringId::TipRecord));
         const std::string_view live =
             m_status.isDevice ? m_ui.tr(StringId::ChipLive) : m_ui.tr(StringId::ChipReplay);
         const Status liveStatus = m_status.isDevice ? Status::Live : Status::Neutral;
         right -= gap + m_ui.chipWidth(live, true);
         m_ui.chip("##live", ImVec2(right, chipY), live, liveStatus, false, true);
+        UiKit::tooltip(m_ui.tr(m_status.isDevice ? StringId::TipLive : StringId::TipReplay));
     }
     std::string deviceLabel = cstr(m_ui.tr(StringId::ReceiverChipNone));
     if (m_status.state == ReceiverState::Opening) {
@@ -451,6 +582,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
     if (m_ui.chip("##device", ImVec2(right, chipY), deviceLabel, Status::Neutral, true, false)) {
         m_openDevices = true;
     }
+    UiKit::tooltip(m_ui.tr(StringId::TipDevice));
     m_deviceAnchor = ImVec2(right + m_ui.chipWidth(deviceLabel, false),
                             chipY + m_ui.size("controlCompact") + gap);
     ImGui::EndDisabled();
@@ -610,6 +742,8 @@ void MainWindow::drawBody() {
     const ImVec2 areaSize(contentSize.x, contentSize.y - tabs);
     const bool running = m_status.state == ReceiverState::Running;
     switch (m_tab) {
+    case Tab::Discover: drawDiscoveryArea(areaOrigin, areaSize); break;
+    case Tab::Journal: drawJournalArea(areaOrigin, areaSize); break;
     case Tab::Aircraft:
         if (running) {
             drawAircraftArea(areaOrigin, areaSize);
@@ -698,20 +832,28 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
                                           ? cstr(m_ui.tr(StringId::TabAircraft))
                                           : cstr(m_ui.tr(StringId::TabAircraft)) + " · " +
                                                 std::to_string(m_aircraft.aircraft().size());
-    const std::array<std::pair<Tab, std::string>, 3> tabs{{
-        {Tab::Spectrum, cstr(m_ui.tr(StringId::TabSpectrum))},
-        {Tab::Aircraft, aircraftLabel},
-        {Tab::Satellites, cstr(m_ui.tr(StringId::TabSatellites))},
+    struct TabEntry {
+        Tab tab;
+        std::string label;
+        StringId tip;
+    };
+    const std::array<TabEntry, 5> tabs{{
+        {Tab::Discover, cstr(m_ui.tr(StringId::TabDiscover)), StringId::TipTabDiscover},
+        {Tab::Spectrum, cstr(m_ui.tr(StringId::TabSpectrum)), StringId::TipTabSpectrum},
+        {Tab::Aircraft, aircraftLabel, StringId::TipTabAircraft},
+        {Tab::Satellites, cstr(m_ui.tr(StringId::TabSatellites)), StringId::TipTabSatellites},
+        {Tab::Journal, cstr(m_ui.tr(StringId::TabJournal)), StringId::TipTabJournal},
     }};
     const float rule = m_ui.tokens().border("focus").value_or(2.0F);
     float x = origin.x + pad;
-    for (const auto& [tab, label] : tabs) {
+    for (const auto& [tab, label, tip] : tabs) {
         const float w = m_ui.textSize(TypeRole::Label, label).x;
         ImGui::SetCursorScreenPos(ImVec2(x - m_ui.spacing("8"), origin.y));
         ImGui::PushID(static_cast<int>(tab));
         if (ImGui::InvisibleButton("##tab", ImVec2(w + 2.0F * m_ui.spacing("8"), tabHeight))) {
             m_tab = tab;
         }
+        UiKit::tooltip(m_ui.tr(tip));
         const bool hovered = ImGui::IsItemHovered();
         ImGui::PopID();
         const bool active = m_tab == tab;
@@ -739,8 +881,63 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
             m_openFft = true;
             m_fftAnchor = ImVec2(infoPos.x + infoWidth, origin.y + tabHeight);
         }
+        UiKit::tooltip(m_ui.tr(StringId::TipFft));
     }
     return tabHeight + m_ui.spacing("8");
+}
+
+void MainWindow::drawJournalArea(ImVec2 origin, ImVec2 size) {
+    const float pad = m_ui.spacing("16");
+    const auto actions =
+        m_journalView.draw(m_ui, ImVec2(origin.x + pad, origin.y),
+                           ImVec2(size.x - 2.0F * pad, size.y - pad), m_journal);
+    store::JournalService* journal = m_services.journal;
+    if (journal == nullptr) {
+        return;
+    }
+    if (actions.filter) {
+        journal->setFilter(*actions.filter);
+    }
+    if (actions.exportJson && m_services.chooseExportFile) {
+        const std::string name = "zarescope-journal-" +
+                                 std::format("{:%F}", std::chrono::floor<std::chrono::days>(
+                                                          std::chrono::system_clock::now())) +
+                                 (*actions.exportJson ? ".json" : ".csv");
+        if (auto file = m_services.chooseExportFile(name)) {
+            journal->exportTo(*file, *actions.exportJson);
+        }
+    }
+    if (actions.reveal && m_services.reveal) {
+        m_services.reveal(*actions.reveal);
+    }
+}
+
+void MainWindow::drawDiscoveryArea(ImVec2 origin, ImVec2 size) {
+    DiscoveryState state;
+    state.hasStation = m_settings.station.has_value();
+    state.receiverRunning = m_status.state == ReceiverState::Running;
+    state.receiverIsDevice = state.receiverRunning && m_status.isDevice;
+    const auto actions = m_discoveryView.draw(m_ui, origin, size, state);
+    if (actions.openSettings) {
+        m_openSettings = true;
+        m_settingsAnchor = ImVec2(ImGui::GetMainViewport()->WorkPos.x +
+                                      ImGui::GetMainViewport()->WorkSize.x - m_ui.spacing("16"),
+                                  ImGui::GetMainViewport()->WorkPos.y + m_ui.size("topBar"));
+    }
+    if (actions.openDevices) {
+        m_openDevices = true;
+    }
+    if (actions.applyPreset && userMayControl()) {
+        for (const auto& preset : m_services.presets) {
+            if (preset.id == *actions.applyPreset) {
+                applyPreset(preset);
+                m_tab = actions.showAircraft ? Tab::Aircraft : Tab::Spectrum;
+            }
+        }
+    }
+    if (actions.showSatellites) {
+        m_tab = Tab::Satellites;
+    }
 }
 
 void MainWindow::drawSpectrumArea(ImVec2 origin, ImVec2 size) {
@@ -937,7 +1134,11 @@ void MainWindow::drawDevicePopup() {
         int ppm = m_status.deviceSettings.ppm;
         ImGui::SetNextItemWidth(kPopoverWidth);
         if (ImGui::InputInt("##ppm", &ppm, 1, 10)) {
-            receiver.setPpm(std::clamp(ppm, -200, 200));
+            m_settings.ppm = std::clamp(ppm, -200, 200);
+            receiver.setPpm(m_settings.ppm);
+            if (m_services.automation != nullptr) {
+                m_services.automation->setPpm(m_settings.ppm);
+            }
         }
         // Bias-tee: off unless the user turns it on, after a warning.
         bool biasTee = m_status.biasTee;
@@ -1011,10 +1212,7 @@ void MainWindow::drawDevicePopup() {
                                 ImGui::CalcTextSize(open.c_str()).x -
                                 2.0F * ImGui::GetStyle().FramePadding.x);
                 if (ImGui::Button(open.c_str())) {
-                    m_spectrum.clear();
-                    receiver.openDevice(entry.index, device::RtlSdrSettings{
-                                                         .centerFrequencyHz = kDefaultFrequencyHz,
-                                                         .sampleRateSps = kDefaultSampleRate});
+                    openDevice(entry.index);
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::PopID();
@@ -1244,6 +1442,67 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
         m_services.satellites != nullptr) {
         m_services.satellites->setMinElevation(m_minElevation);
     }
+    if (m_services.automation != nullptr) {
+        bool autoRecord = m_automation.enabled;
+        if (ImGui::Checkbox(cstr(m_ui.tr(StringId::AutoRecordLabel)).c_str(), &autoRecord)) {
+            m_services.automation->setEnabled(autoRecord);
+        }
+        if (ImGui::Checkbox(cstr(m_ui.tr(StringId::KeepRecordings)).c_str(),
+                            &m_settings.keepBaseband)) {
+            m_services.automation->setKeepBaseband(m_settings.keepBaseband);
+        }
+    }
+
+    // The receiver: what a newly opened stick starts with.
+    ImGui::Separator();
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::SettingsReceiver)).c_str());
+    ImGui::TextDisabled("%s", cstr(m_ui.tr(StringId::DefaultRateLabel)).c_str());
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    if (ImGui::BeginCombo("##defaultRate", formatSampleRate(m_settings.defaultSampleRateSps).c_str())) {
+        for (uint32_t option : device::kSampleRates) {
+            if (ImGui::Selectable(formatSampleRate(option).c_str(),
+                                  option == m_settings.defaultSampleRateSps)) {
+                m_settings.defaultSampleRateSps = option;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+    int ppm = m_settings.ppm;
+    if (ImGui::InputInt(cstr(m_ui.tr(StringId::PpmLabel)).c_str(), &ppm, 1, 10)) {
+        m_settings.ppm = std::clamp(ppm, -200, 200);
+        if (m_status.isDevice && userMayControl()) {
+            m_services.receiver->setPpm(m_settings.ppm);
+        }
+        if (m_services.automation != nullptr) {
+            m_services.automation->setPpm(m_settings.ppm);
+        }
+    }
+
+    // Where recordings, images, the TLE cache and the journal live.
+    ImGui::Separator();
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::DataFolderLabel)).c_str());
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPopoverWidth);
+    ImGui::TextDisabled("%s", m_settings.dataFolder.empty()
+                                  ? cstr(m_ui.tr(StringId::DataFolderDefault)).c_str()
+                                  : m_settings.dataFolder.c_str());
+    ImGui::PopTextWrapPos();
+    if (ImGui::Button(cstr(m_ui.tr(StringId::Choose)).c_str()) && m_services.chooseFolder) {
+        if (auto folder = m_services.chooseFolder()) {
+            m_settings.dataFolder = folder->string();
+        }
+    }
+    if (!m_settings.dataFolder.empty()) {
+        ImGui::SameLine();
+        if (ImGui::Button(cstr(m_ui.tr(StringId::UseDefault)).c_str())) {
+            m_settings.dataFolder.clear();
+        }
+    }
+    // Changed since start-up: it applies next time.
+    if (m_settings.dataFolder != m_services.settings.dataFolder) {
+        ImGui::TextDisabled("%s", cstr(m_ui.tr(StringId::RestartNote)).c_str());
+    }
+
     ImGui::Separator();
     ImGui::TextUnformatted(cstr(m_ui.tr(StringId::LanguageLabel)).c_str());
     if (ImGui::RadioButton("English", state.language == Language::English)) {

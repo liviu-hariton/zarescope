@@ -461,4 +461,10 @@ bool UiKit::banner(const char* id, ImVec2 min, float width, Status status, Icon 
     return clicked;
 }
 
+void UiKit::tooltip(std::string_view text) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("%.*s", static_cast<int>(text.size()), text.data());
+    }
+}
+
 }  // namespace zarescope::ui

@@ -176,6 +176,7 @@ float SatelliteView::drawAutomation(UiKit& ui, ImVec2 pos, float width,
     if (ui.toggle("##autoRecord", ImVec2(x, y), on, ui.tr(StringId::AutoRecordLabel))) {
         actions.autoRecord = on;
     }
+    UiKit::tooltip(ui.tr(StringId::TipAutoRecord));
     // SatDump's state, right-aligned on the switch's row, when there's room.
     if (!satdumpLine.empty()) {
         const float textW = ui.textSize(TypeRole::Caption, satdumpLine).x;

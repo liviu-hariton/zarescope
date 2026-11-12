@@ -25,7 +25,7 @@ struct Options {
     std::optional<theme::ThemeVariant> variant;
     // Open this .cu8 recording at start-up.
     std::optional<std::filesystem::path> recording;
-    // The tab to open on: "spectrum", "aircraft" or "satellites".
+    // The tab to open on: "discover", "spectrum", "aircraft", "satellites" or "journal".
     std::string tab;
     // The station's location (latitude, longitude in degrees).
     std::optional<std::pair<double, double>> station;

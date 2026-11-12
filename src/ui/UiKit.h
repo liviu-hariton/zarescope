@@ -112,6 +112,10 @@ public:
 
     void icon(ImDrawList& drawList, Icon icon, ImVec2 center, float size, ImU32 color) const;
 
+    // A tooltip for the last widget drawn, after the usual hover delay; it
+    // also shows over disabled widgets, to say what they would do.
+    static void tooltip(std::string_view text);
+
 private:
     const theme::DesignTokens& m_tokens;
     const Typography& m_typography;

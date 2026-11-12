@@ -25,4 +25,14 @@ std::string formatClock(std::chrono::system_clock::time_point when, ClockZone zo
     return std::format("{:02}:{:02}:{:02}", local->tm_hour, local->tm_min, local->tm_sec);
 }
 
+std::string formatLocalDateTime(std::chrono::system_clock::time_point when) {
+    const std::time_t t = std::chrono::system_clock::to_time_t(when);
+    const std::tm* local = std::localtime(&t);  // UI thread only, as above
+    if (local == nullptr) {
+        return "----------  --:--";
+    }
+    return std::format("{:04}-{:02}-{:02} {:02}:{:02}", local->tm_year + 1900, local->tm_mon + 1,
+                       local->tm_mday, local->tm_hour, local->tm_min);
+}
+
 }  // namespace zarescope::ui

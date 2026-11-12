@@ -118,7 +118,9 @@ add_library(zarescope_ui STATIC
     ui/theme/PlotTheme.cpp
     ui/Clock.cpp
     ui/Format.cpp
+    ui/DiscoveryView.cpp
     ui/FrequencyDisplay.cpp
+    ui/JournalView.cpp
     ui/LogoMark.cpp
     ui/MainWindow.cpp
     ui/SatelliteView.cpp

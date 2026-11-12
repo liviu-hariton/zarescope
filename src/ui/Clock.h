@@ -16,4 +16,7 @@ enum class ClockZone { Utc, Local };
 // "HH:MM:SS", 24-hour, in UTC or in the Mac's time zone.
 std::string formatClock(std::chrono::system_clock::time_point when, ClockZone zone);
 
+// "2026-11-12 09:15", in the Mac's time zone (the journal's rows).
+std::string formatLocalDateTime(std::chrono::system_clock::time_point when);
+
 }  // namespace zarescope::ui

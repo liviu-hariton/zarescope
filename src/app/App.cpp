@@ -5,6 +5,7 @@
 #include "app/App.h"
 
 #include "app/PassAutomation.h"
+#include "app/Settings.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
 #include "platform/AppPaths.h"
@@ -16,6 +17,7 @@
 #include "platform/WindowAppearance.h"
 #include "sat/SatCatalog.h"
 #include "sat/SatelliteService.h"
+#include "store/Journal.h"
 #include "ui/MainWindow.h"
 #include "ui/Typography.h"
 #include "ui/theme/DesignTokens.h"
@@ -128,6 +130,10 @@ struct App::State {
     // Pass recording drives the receiver: it goes before the receiver does.
     std::unique_ptr<PassAutomation> automation;
     platform::KeepAwake keepAwake;
+    // Settings and the journal write on their own threads; destroyed last,
+    // so whatever the window saved on its way out is still written.
+    std::unique_ptr<SettingsStore> settingsStore;
+    std::unique_ptr<store::JournalService> journal;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -210,11 +216,36 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     }
     s.typography.emplace(*fonts, *s.tokens);
 
-    s.shell.variant = options.variant.value_or(s.tokens->defaultVariant());
+    // Settings (M6): read once here, before the window shows anything.
+    std::string warning;
+    const std::filesystem::path settingsFile = paths.userData / "settings.json";
+    const Settings settings = loadSettings(settingsFile, warning);
+    if (!warning.empty()) {
+        std::fprintf(stderr, "settings: %s\n", warning.c_str());
+    }
+    s.settingsStore = std::make_unique<SettingsStore>(settingsFile);
+    // The data folder: the user's choice if it can be used, else the default.
+    std::filesystem::path dataRoot = paths.userData;
+    if (!settings.dataFolder.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(settings.dataFolder, ec);
+        if (!ec && std::filesystem::is_directory(settings.dataFolder, ec)) {
+            dataRoot = settings.dataFolder;
+        } else {
+            std::fprintf(stderr, "data folder %s isn't usable; using %s\n",
+                         settings.dataFolder.c_str(), paths.userData.c_str());
+        }
+    }
+    s.journal = std::make_unique<store::JournalService>(dataRoot / "journal.sqlite");
+
+    s.shell.variant = options.variant.value_or(settings.theme == "light"
+                                                   ? theme::ThemeVariant::Light
+                                                   : theme::ThemeVariant::Dark);
+    s.shell.language = settings.language == "ro" ? ui::Language::Romanian : ui::Language::English;
     applyThemeEverywhere(*s.tokens, s.shell.variant, s.window);
 
     s.receiver = std::make_unique<device::Receiver>();
-    const std::filesystem::path recordings = paths.userData / "recordings";
+    const std::filesystem::path recordings = dataRoot / "recordings";
     ui::MainWindowServices services;
     services.receiver = s.receiver.get();
     services.recordingsFolder = recordings;
@@ -225,10 +256,13 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
         // Pass recording (M5): recordings next to the user's, images in products/.
         AutomationConfig automation;
         automation.recordings = recordings;
-        automation.products = paths.userData / "products";
+        automation.products = dataRoot / "products";
+        automation.keepBaseband = settings.keepBaseband;
+        automation.ppm = settings.ppm;
         automation.satDumpCandidates = platform::satDumpCandidates();
         automation.software = std::string("Zarescope ") + ZARESCOPE_VERSION;
         s.automation = std::make_unique<PassAutomation>(*s.receiver, *catalog, automation);
+        s.automation->setEnabled(settings.autoRecord);
         if (options.simulatePassSeconds) {
             // The first satellite automation can record, starting in 20 s.
             const sat::PassScheduler scheduler(*catalog);
@@ -257,7 +291,7 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
                                : platform::KeepAwake::Level::Normal);
         };
         s.satellites = std::make_unique<sat::SatelliteService>(
-            std::move(*catalog), paths.userData / "tle_cache",
+            std::move(*catalog), dataRoot / "tle_cache",
             std::string("Zarescope/") + ZARESCOPE_VERSION + " (+https://zarescope.eu)");
         services.satellites = s.satellites.get();
     } else {
@@ -267,6 +301,16 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
         platform::notify(title, body);
     };
     services.initialTab = options.tab;
+    services.settings = settings;
+    services.saveSettings = [&store = *s.settingsStore](const Settings& changed) {
+        store.save(changed);
+    };
+    services.journal = s.journal.get();
+    services.dataFolder = dataRoot;
+    services.chooseExportFile = [](const std::string& name) {
+        return platform::chooseExportFile(name);
+    };
+    services.chooseFolder = [dataRoot] { return platform::chooseFolder(dataRoot); };
     if (options.station) {
         services.station = adsb::LatLon{options.station->first, options.station->second};
     }

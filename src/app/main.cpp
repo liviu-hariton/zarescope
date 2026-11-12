@@ -7,7 +7,7 @@
 //                        (open build/Zarescope.app --args --theme light)
 //   --open FILE.cu8      play this recording at start-up
 //   --station LAT,LON    the station's location (degrees; north and east positive)
-//   --tab NAME           open on spectrum, aircraft or satellites
+//   --tab NAME           open on discover, spectrum, aircraft, satellites or journal
 //   --simulate-pass SECONDS
 //                        a made-up Meteor pass from 20 s after start-up, recorded
 //                        and decoded automatically (pair it with --open on a
@@ -47,8 +47,10 @@ bool parseArguments(int argc, char** argv, zarescope::app::Options& options) {
             options.station = std::make_pair(lat, lon);
         } else if (arg == "--tab" && i + 1 < argc) {
             const std::string_view tab = argv[++i];
-            if (tab != "spectrum" && tab != "aircraft" && tab != "satellites") {
-                std::fprintf(stderr, "--tab takes spectrum, aircraft or satellites\n");
+            if (tab != "discover" && tab != "spectrum" && tab != "aircraft" &&
+                tab != "satellites" && tab != "journal") {
+                std::fprintf(stderr,
+                             "--tab takes discover, spectrum, aircraft, satellites or journal\n");
                 return false;
             }
             options.tab = std::string(tab);

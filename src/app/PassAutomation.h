@@ -95,6 +95,8 @@ struct AutomationConfig {
     std::chrono::seconds minRecording{30};
     // Keep the baseband after a successful decode (it is ~2 MB/s).
     bool keepBaseband = false;
+    // Frequency correction for a stick the automation opens itself.
+    int ppm = 0;
 };
 
 class PassAutomation {
@@ -119,6 +121,10 @@ public:
     void stopCurrent();
     // Looks for SatDump again (after the user installed it).
     void checkSatDump();
+    // Settings that can change while running (M6): the stick's frequency
+    // correction when a pass opens it, and whether to keep the baseband.
+    void setPpm(int ppm) { m_config.ppm = ppm; }
+    void setKeepBaseband(bool keep) { m_config.keepBaseband = keep; }
     // A made-up pass, for trying the whole chain without waiting for a real
     // one (--simulate-pass). Joins the predicted passes.
     void addSimulatedPass(sat::PlannedPass pass);

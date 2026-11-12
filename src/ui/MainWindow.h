@@ -3,7 +3,7 @@
 // The main window (design/docs/DESIGN.md §6), as far as M1 goes:
 //
 //   ┌ top bar (64) ────────────────────────────────────────────────────────┐
-//   │ logo  98.000 000 MHz  [Gain auto ⌄]    [RTL-SDR Blog V4] (LIVE) [● Record] [Dark|Light] │
+//   │ logo  98.000 000 MHz  [Gain auto ⌄]    [RTL-SDR Blog V4] (LIVE) [● Record] [⚙]        │
 //   ├ banner (44): recording / an error, only when there is one ────────────┤
 //   │ Spectrum                                         FFT 4096 · 586 Hz/bin │
 //   │ spectrum (210)                                                         │
@@ -22,13 +22,17 @@
 #pragma once
 
 #include "app/PassAutomation.h"
+#include "app/Settings.h"
 #include "decoders/adsb/AircraftStore.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
 #include "dsp/AudioDemodulator.h"
 #include "sat/SatelliteService.h"
+#include "store/Journal.h"
 #include "ui/AircraftView.h"
+#include "ui/DiscoveryView.h"
 #include "ui/FrequencyDisplay.h"
+#include "ui/JournalView.h"
 #include "ui/SatelliteView.h"
 #include "ui/SpectrumView.h"
 #include "ui/Strings.h"
@@ -37,6 +41,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <map>
 #include <set>
 #include <string>
 
@@ -72,6 +77,18 @@ struct MainWindowServices {
     // Tells the OS the app works unattended: `waiting` while automatic
     // recording is on, `busy` while a pass is recorded or decoded.
     std::function<void(bool waiting, bool busy)> keepAwake;
+    // Settings (M6): what was saved last time, and how to save changes
+    // (returns at once; the store writes on its own thread).
+    app::Settings settings;
+    std::function<void(const app::Settings&)> saveSettings;
+    // The journal (M6); null when it couldn't be created.
+    store::JournalService* journal = nullptr;
+    // The system's "save as" dialog for an export, and its folder picker.
+    std::function<std::optional<std::filesystem::path>(const std::string& defaultName)>
+        chooseExportFile;
+    std::function<std::optional<std::filesystem::path>()> chooseFolder;
+    // Where the data actually lives this run (the default or the setting).
+    std::filesystem::path dataFolder;
 };
 
 class MainWindow {
@@ -98,6 +115,13 @@ private:
     void drawAircraftArea(ImVec2 origin, ImVec2 size);
     void notifyUpcomingPasses();
     void updateAutomation();
+    // Journal entries for what happened this frame (M6).
+    void updateJournal();
+    // Saves the settings when something changed this frame.
+    void saveSettingsIfChanged(const ShellState& state);
+    void drawJournalArea(ImVec2 origin, ImVec2 size);
+    void drawDiscoveryArea(ImVec2 origin, ImVec2 size);
+    void openDevice(uint32_t index);
     // The banner text for how a pass ended.
     [[nodiscard]] std::string outcomeMessage(const app::PassOutcome& outcome) const;
     // False while a pass holds the stick: tuning, gain, device and recording
@@ -133,7 +157,20 @@ private:
     app::AutomationStatus m_automation;                  // this frame's
     uint64_t m_notifiedOutcome = 0;   // serial of the last pass outcome notified
     uint64_t m_dismissedOutcome = 0;  // … and of the last one dismissed
-    enum class Tab { Spectrum, Aircraft, Satellites };
+    // Settings: the current ones, and the last ones handed to the store.
+    app::Settings m_settings;
+    app::Settings m_savedSettings;
+    // The journal: this frame's snapshot, its view, and what was written.
+    store::JournalService::Snapshot m_journal;
+    JournalView m_journalView;
+    uint64_t m_journaledOutcome = 0;
+    std::string m_journalDay;                          // aircraft rows are per UTC day
+    std::map<uint32_t, std::string> m_journaledAircraft;  // ICAO → callsign written
+    std::filesystem::path m_trackedRecording;          // the recording being watched
+    bool m_trackedByUser = false;                      // … started by the user, not a pass
+    bool m_trackedDone = false;
+    DiscoveryView m_discoveryView;
+    enum class Tab { Discover, Spectrum, Aircraft, Satellites, Journal };
     Tab m_tab = Tab::Spectrum;
     bool m_wasAdsbActive = false;
     // Station location being edited in Settings.
