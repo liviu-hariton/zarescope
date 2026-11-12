@@ -179,3 +179,8 @@ target_compile_options(zs_sgp4 PRIVATE -w)
 # --- libcurl (the system's) — TLE downloads from CelesTrak --------------------
 # Part of macOS; on Linux and Windows a system or vcpkg package.
 find_package(CURL REQUIRED)
+
+# --- SQLite (the system's) — the journal (M6) ---------------------------------
+# Part of macOS (libsqlite3 in the SDK); on Linux and Windows a system or
+# vcpkg package.
+find_package(SQLite3 REQUIRED)

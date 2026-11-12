@@ -8,8 +8,9 @@
 #   zarescope_sat       catalog, TLE, SGP4, passes, pass scheduler → sgp4
 #   zarescope_os        running external programs (POSIX), tool locations
 #   zarescope_integrations  SatDump runner     → zarescope_os
-#   zarescope_automation    automatic pass recording and decoding
-#                           → zarescope_device, zarescope_sat, zarescope_integrations
+#   zarescope_store     the journal (SQLite)     → SQLite (system)
+#   zarescope_appcore   pass automation, settings → zarescope_device, zarescope_sat,
+#                                                  zarescope_integrations
 #   zarescope_audio     sound output             → miniaudio
 #   zarescope_device    sample sources, IQ files → zarescope_dsp, librtlsdr
 #   zarescope_theme     design tokens            → nlohmann/json
@@ -89,12 +90,21 @@ target_link_libraries(zarescope_integrations
     PRIVATE zarescope_os zarescope_device)
 zarescope_set_warnings(zarescope_integrations)
 
-add_library(zarescope_automation STATIC
-    app/PassAutomation.cpp)
-target_include_directories(zarescope_automation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(zarescope_automation
-    PUBLIC zarescope_device zarescope_sat zarescope_integrations)
-zarescope_set_warnings(zarescope_automation)
+add_library(zarescope_store STATIC
+    store/Journal.cpp)
+target_include_directories(zarescope_store PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_store
+    PRIVATE zarescope_device nlohmann_json::nlohmann_json SQLite3::SQLite3)
+zarescope_set_warnings(zarescope_store)
+
+add_library(zarescope_appcore STATIC
+    app/PassAutomation.cpp
+    app/Settings.cpp)
+target_include_directories(zarescope_appcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_appcore
+    PUBLIC zarescope_device zarescope_sat zarescope_integrations
+    PRIVATE nlohmann_json::nlohmann_json)
+zarescope_set_warnings(zarescope_appcore)
 
 add_library(zarescope_theme STATIC
     ui/theme/DesignTokens.cpp)
@@ -117,7 +127,7 @@ add_library(zarescope_ui STATIC
     ui/Typography.cpp
     ui/UiKit.cpp
     ui/WaterfallColors.cpp)
-target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zarescope_automation zs_imgui zs_implot)
+target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zarescope_appcore zarescope_store zs_imgui zs_implot)
 zarescope_set_warnings(zarescope_ui)
 
 if(APPLE)

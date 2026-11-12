@@ -58,5 +58,5 @@ set_target_properties(Zarescope PROPERTIES
     MACOSX_BUNDLE_COPYRIGHT "© ${ZARESCOPE_BUILD_YEAR} Liviu Hariton. GPL-3.0-or-later.")
 
 target_compile_definitions(Zarescope PRIVATE ZARESCOPE_VERSION="${PROJECT_VERSION}")
-target_link_libraries(Zarescope PRIVATE zarescope_ui zarescope_automation zarescope_os zarescope_platform)
+target_link_libraries(Zarescope PRIVATE zarescope_ui zarescope_appcore zarescope_store zarescope_os zarescope_platform)
 zarescope_set_warnings(Zarescope)

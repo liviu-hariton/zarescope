@@ -11,6 +11,7 @@
 add_executable(zarescope_tests
     test_main.cpp
     test_smoke.cpp
+    test_store.cpp
     test_adsb.cpp
     test_audio.cpp
     test_automation.cpp
@@ -25,7 +26,7 @@ add_executable(zarescope_tests
     test_ui_format.cpp
     test_strings_clock.cpp)
 target_link_libraries(zarescope_tests PRIVATE zarescope_ui zarescope_device zarescope_adsb zarescope_sat
-    zarescope_automation zarescope_integrations zarescope_os doctest::doctest)
+    zarescope_appcore zarescope_store zarescope_integrations zarescope_os SQLite3::SQLite3 doctest::doctest)
 target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_TOKENS_FILE="${ZARESCOPE_TOKENS_FILE}"
