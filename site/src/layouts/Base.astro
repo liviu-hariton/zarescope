@@ -8,7 +8,7 @@
 import "../styles/global.css";
 import Icon from "../components/Icon.astro";
 import { routes, t, type Lang, type PageId } from "../i18n/ui";
-import { beerUrl, copyrightYears, issuesUrl, repoUrl } from "../data/site";
+import { beerUrl, contactEmail, copyrightYears, issuesUrl, repoUrl } from "../data/site";
 
 interface Props {
   lang: Lang;
@@ -129,9 +129,10 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
         <li><a href={r.download}>{s.nav.download}</a></li>
         <li><a href={r.guide}>{s.nav.guide}</a></li>
         <li><a href={r.privacy}>{s.footer.privacy}</a></li>
+        <li><a href={otherHref} hreflang={other} lang={other}>{s.otherLang}</a></li>
         <li><a class="with-mark" href={repoUrl}><Icon name="github" size={15} />{s.nav.github}</a></li>
         <li><a href={issuesUrl}>{s.footer.issues}</a></li>
-        <li><a href={otherHref} hreflang={other} lang={other}>{s.otherLang}</a></li>
+        <li><a class="with-mark" href={`mailto:${contactEmail}`} title={s.footer.writeTo}><Icon name="mail" size={15} />{contactEmail}</a></li>
       </ul>
       <div class="foot-small">
         <p>{s.footer.noTracking}</p>
@@ -219,7 +220,8 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
   .foot .brand img { width: 30px; height: 30px; }
   .foot-brand p { color: var(--text-2); font-size: 15px; margin-top: var(--s3); }
   .foot-brand .faint { color: var(--text-3); margin-top: var(--s2); }
-  .foot-links { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, auto); gap: var(--s2) var(--s7); align-content: start; }
+  /* Two columns, filled top to bottom: this site's pages, then GitHub and the mailbox. */
+  .foot-links { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, auto); grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: var(--s2) var(--s7); align-content: start; }
   .foot-links a { color: var(--text-2); text-decoration: none; font-size: 15px; }
   .foot-links a:hover { color: var(--text); text-decoration: underline; }
   .with-mark { display: inline-flex; align-items: center; gap: 7px; }

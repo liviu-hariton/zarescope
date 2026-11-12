@@ -22,6 +22,8 @@ export const dmgName = `Zarescope-${version}-arm64.dmg`;
 export const dmgUrl = `${repoUrl}/releases/download/v${version}/${dmgName}`;
 export const releasesUrl = `${repoUrl}/releases`;
 export const issuesUrl = `${repoUrl}/issues`;
+/** The project's mailbox, shown in the footer of every page. */
+export const contactEmail = "hello@zarescope.eu";
 /** Where "Buy me a beer" leads (a plain link: nothing is loaded from there). */
 export const beerUrl = "https://www.buymeacoffee.com/liviuhariton";
 /** The RTL-SDR Blog's own page listing where to buy its sticks. */

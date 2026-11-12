@@ -27,6 +27,7 @@ const en = {
     tagline: "Listen to the sky. Free and open source, for the Mac.",
     privacy: "Privacy",
     issues: "Report a problem",
+    writeTo: "Write to us",
     beerNote: "Zarescope is free. If it showed you something up there:",
     beer: "Buy me a beer",
     noTracking: "No cookies, no trackers, nothing loaded from other sites.",
@@ -151,6 +152,7 @@ const en = {
       ["Recordings, images and the journal", "Stay on your Mac, in the data folder you choose. Nothing is uploaded."],
       ["SatDump", "A separate program you install; Zarescope runs it on your recordings, on your Mac."],
       ["Buy me a beer", "The link opens buymeacoffee.com, where their privacy statement applies. This site loads nothing from there."],
+      ["Writing to us", "Mail sent to hello@zarescope.eu is read by a person and used only to answer you. Your address isn't added to any list or given to anyone."],
     ] as [string, string][],
   },
   notFound: {
@@ -175,6 +177,7 @@ const ro: typeof en = {
     tagline: "Ascultă cerul. Gratuit și open source, pentru Mac.",
     privacy: "Confidențialitate",
     issues: "Raportează o problemă",
+    writeTo: "Scrie-ne",
     beerNote: "Zarescope e gratuit. Dacă ți-a arătat ceva acolo sus:",
     beer: "Cumpără-mi o bere",
     noTracking: "Fără cookie-uri, fără urmărire, nimic încărcat de pe alte site-uri.",
@@ -299,6 +302,7 @@ const ro: typeof en = {
       ["Înregistrările, imaginile și jurnalul", "Rămân pe Mac-ul tău, în dosarul de date ales de tine. Nu se încarcă nimic."],
       ["SatDump", "Un program separat pe care îl instalezi tu; Zarescope îl rulează pe înregistrările tale, pe Mac-ul tău."],
       ["Cumpără-mi o bere", "Linkul deschide buymeacoffee.com, unde se aplică declarația lor de confidențialitate. Acest site nu încarcă nimic de acolo."],
+      ["Când ne scrii", "Mesajele trimise la hello@zarescope.eu le citește un om și sunt folosite doar ca să-ți răspundem. Adresa ta nu ajunge pe nicio listă și nu e dată nimănui."],
     ],
   },
   notFound: {
