@@ -7,13 +7,15 @@
 //                        (open build/Zarescope.app --args --theme light)
 //   --open FILE.cu8      play this recording at start-up
 //   --station LAT,LON    the station's location (degrees; north and east positive)
-//   --tab NAME           open on discover, spectrum, aircraft, satellites or journal
+//   --tab NAME           open on discover, spectrum, aircraft, satellites, journal or help
+//   --print-menus        print the menu bar (English) and exit
 //   --simulate-pass SECONDS
 //                        a made-up Meteor pass from 20 s after start-up, recorded
 //                        and decoded automatically (pair it with --open on a
 //                        137.9 MHz recording)
 
 #include "app/App.h"
+#include "ui/AppMenuModel.h"
 
 #include <cstdio>
 #include <exception>
@@ -48,9 +50,9 @@ bool parseArguments(int argc, char** argv, zarescope::app::Options& options) {
         } else if (arg == "--tab" && i + 1 < argc) {
             const std::string_view tab = argv[++i];
             if (tab != "discover" && tab != "spectrum" && tab != "aircraft" &&
-                tab != "satellites" && tab != "journal") {
-                std::fprintf(stderr,
-                             "--tab takes discover, spectrum, aircraft, satellites or journal\n");
+                tab != "satellites" && tab != "journal" && tab != "help") {
+                std::fprintf(stderr, "--tab takes discover, spectrum, aircraft, satellites, "
+                                     "journal or help\n");
                 return false;
             }
             options.tab = std::string(tab);
@@ -61,6 +63,8 @@ bool parseArguments(int argc, char** argv, zarescope::app::Options& options) {
                 return false;
             }
             options.simulatePassSeconds = seconds;
+        } else if (arg == "--print-menus") {
+            options.printMenus = true;
         } else if (arg == "--open" && i + 1 < argc) {
             options.recording = std::filesystem::path(argv[++i]);
         } else if (arg.starts_with("-psn_")) {
@@ -80,6 +84,16 @@ int main(int argc, char** argv) {
     zarescope::app::Options options;
     if (!parseArguments(argc, argv, options)) {
         return 2;
+    }
+    if (options.printMenus) {
+        // The structure only; the presets appear by their ids here.
+        std::fputs(zarescope::ui::describeMenus(
+                       zarescope::ui::buildMenus(zarescope::ui::Language::English,
+                                                 {"fm-broadcast", "airband", "amateur-2m",
+                                                  "pmr446", "adsb", "meteor"}))
+                       .c_str(),
+                   stdout);
+        return 0;
     }
     try {
         zarescope::app::App app(options);

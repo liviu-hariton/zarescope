@@ -373,3 +373,20 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Why.** Typing coordinates is the step new users stumble on. Core Location is precise, needs no network service of ours, and keeps the location on the Mac.
 - **Rejected.** An IP geolocation web service: it sends the user's IP to a third party and is only city-level accurate (often 10–50 km off), which matters for aircraft distances.
 
+## 2026-11-12 — A native menu bar, the user guide in Markdown, About as a modal
+
+- **Decision.**
+  - **Menu bar.** The menu bar is a real NSMenu (`platform::AppMenu`), built from plain data (`ui::buildMenus`); GLFW's default menu is turned off (`GLFW_COCOA_MENUBAR`).
+    - Commands come back as numbers, and `MainWindow` runs them on its next frame.
+    - `validateMenuItem:` reads a per-frame state, so items are enabled, checked and retitled when a menu opens.
+    - Edit commands reach the focused text field as ⌘-key presses: down on one frame, up on the next.
+  - **User guide.** It lives in `resources/help/guide.en.md` and `guide.ro.md`, a small Markdown subset parsed by `ui::parseGuide`. A test keeps the two languages' sections, order and ids in step.
+  - **About.** The About window is a Dear ImGui modal in the app's own style.
+- **Why.**
+  - The menu bar is what Mac users look for. Shortcuts are found there, and AppKit routes ⌘-keys to it before the window sees them.
+  - A guide of some three thousand words doesn't belong in the string table row by row. Markdown files can be read and reviewed on GitHub as they are, and the same file is the document (`docs/USER_GUIDE.md` points to it).
+  - The modal keeps About consistent with the rest of the design.
+- **Rejected.**
+  - Qt or another toolkit for these windows: the project avoids heavy dependencies (DEPENDENCIES.md), and the app stays a 3 MB bundle.
+  - The standard `orderFrontStandardAboutPanel`: it can't show the receive-only note or Copy version info in our style.
+  - A second native window for Help: Dear ImGui here draws into one window.

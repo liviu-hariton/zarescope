@@ -114,7 +114,11 @@ zarescope_set_warnings(zarescope_theme)
 
 add_library(zarescope_ui STATIC
     ui/theme/ImGuiTheme.cpp
+    ui/AboutView.cpp
     ui/AircraftView.cpp
+    ui/AppMenuModel.cpp
+    ui/Guide.cpp
+    ui/HelpView.cpp
     ui/theme/PlotTheme.cpp
     ui/Clock.cpp
     ui/Format.cpp
@@ -134,6 +138,7 @@ zarescope_set_warnings(zarescope_ui)
 
 if(APPLE)
     add_library(zarescope_platform STATIC
+        platform/macos/MacAppMenu.mm
         platform/macos/MacAppPaths.mm
         platform/macos/MacDesktop.mm
         platform/macos/MacFileDialog.mm

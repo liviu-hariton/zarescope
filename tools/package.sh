@@ -73,7 +73,8 @@ codesign -d --entitlements - "$app" 2>/dev/null | grep -q personal-information.l
     fail "the location entitlement is missing"
 # 5. Everything the app reads at start-up is in the bundle.
 for file in zarescope.tokens.json presets.json sat_catalog.json Zarescope.icns \
-            fonts/Inter-Regular.ttf fonts/JetBrainsMonoNL-Regular.ttf; do
+            fonts/Inter-Regular.ttf fonts/JetBrainsMonoNL-Regular.ttf \
+            help/guide.en.md help/guide.ro.md; do
     [ -f "$app/Contents/Resources/$file" ] || fail "missing from the bundle: $file"
 done
 echo "arm64, macOS $minimum or later, system libraries only, resources present"

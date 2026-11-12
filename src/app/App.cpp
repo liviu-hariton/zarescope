@@ -8,6 +8,7 @@
 #include "app/Settings.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
+#include "platform/AppMenu.h"
 #include "platform/AppPaths.h"
 #include "platform/Desktop.h"
 #include "platform/FileDialog.h"
@@ -19,6 +20,7 @@
 #include "sat/SatCatalog.h"
 #include "sat/SatelliteService.h"
 #include "store/Journal.h"
+#include "ui/Guide.h"
 #include "ui/MainWindow.h"
 #include "ui/Typography.h"
 #include "ui/theme/DesignTokens.h"
@@ -36,6 +38,8 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <fstream>
+#include <sstream>
 #include <chrono>
 #include <cstdio>
 #include <optional>
@@ -96,6 +100,19 @@ void applyWindowLimits(GLFWwindow* window, float scale) {
     if (width < minWidth || height < minHeight) {
         glfwSetWindowSize(window, std::max(width, minWidth), std::max(height, minHeight));
     }
+}
+
+// The user guide's Markdown, parsed; std::nullopt (and a note on stderr)
+// when the file is missing: the Help tab then says so.
+std::optional<ui::Guide> loadGuide(const std::filesystem::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) {
+        std::fprintf(stderr, "help: cannot read %s\n", file.c_str());
+        return std::nullopt;
+    }
+    std::ostringstream text;
+    text << in.rdbuf();
+    return ui::parseGuide(text.str());
 }
 
 void glfwError(int code, const char* description) {
@@ -178,6 +195,10 @@ struct App::State {
     // Answers "use my current location"; goes before the window, whose
     // callback it may still call (with "cancelled").
     std::unique_ptr<platform::LocationFinder> locationFinder;
+    // The menu bar, and the user guide in English and Romanian.
+    std::unique_ptr<platform::AppMenu> menu;
+    std::optional<ui::Guide> guideEnglish;
+    std::optional<ui::Guide> guideRomanian;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -200,6 +221,7 @@ struct App::State {
             renderer->shutdown();  // releases GPU textures, including the waterfall's
         }
         locationFinder.reset();  // a pending answer reaches the window first
+        menu.reset();
         // The window's views unregister their textures: needs the context.
         mainWindow.reset();
         satellites.reset();  // joins its worker (a download in flight ends within its timeout)
@@ -225,6 +247,8 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     State& s = *m_state;
 
     glfwSetErrorCallback(glfwError);
+    // The menu bar is ours (platform::AppMenu), not GLFW's default one.
+    glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
     if (glfwInit() == GLFW_FALSE) {
         throw std::runtime_error("GLFW failed to start");
     }
@@ -389,6 +413,30 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     } else {
         std::fprintf(stderr, "%s\n", error.c_str());  // the app still works without presets
     }
+    // The menu bar and its plumbing.
+    s.menu = std::make_unique<platform::AppMenu>();
+    services.installMenu = [&menu = *s.menu](const std::vector<platform::MenuSpec>& menus) {
+        menu.install(menus);
+    };
+    services.setMenuState = [&menu = *s.menu](std::map<int, platform::MenuItemState> state) {
+        menu.setState(std::move(state));
+    };
+    services.takeMenuCommands = [&menu = *s.menu] { return menu.takeCommands(); };
+    services.openUrl = [](const std::string& url) { platform::openUrl(url); };
+    services.quit = [window = s.window] { glfwSetWindowShouldClose(window, GLFW_TRUE); };
+    // The user guide, read once here (resources/help in the bundle).
+    s.guideEnglish = loadGuide(paths.resources / "help" / "guide.en.md");
+    s.guideRomanian = loadGuide(paths.resources / "help" / "guide.ro.md");
+    services.guideEnglish = s.guideEnglish ? &*s.guideEnglish : nullptr;
+    services.guideRomanian = s.guideRomanian ? &*s.guideRomanian : nullptr;
+    // About: the version, what it runs on, the copyright years.
+    services.about.version = ZARESCOPE_VERSION;
+    services.about.build = platform::systemVersion() + " · arm64 · Dear ImGui " IMGUI_VERSION;
+    constexpr int kFirstYear = 2026;
+    services.about.copyrightYears =
+        ZARESCOPE_BUILD_YEAR > kFirstYear
+            ? std::to_string(kFirstYear) + "–" + std::to_string(ZARESCOPE_BUILD_YEAR)
+            : std::to_string(kFirstYear);
     s.mainWindow.emplace(*s.tokens, *s.typography, std::move(services));
     if (options.recording) {
         s.receiver->openFile(*options.recording);

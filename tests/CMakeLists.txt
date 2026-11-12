@@ -17,6 +17,7 @@ add_executable(zarescope_tests
     test_automation.cpp
     test_design_tokens.cpp
     test_dsp.cpp
+    test_help_menu.cpp
     test_imgui_theme.cpp
     test_iq_files.cpp
     test_presets.cpp
@@ -33,7 +34,8 @@ target_compile_definitions(zarescope_tests PRIVATE
     ZARESCOPE_LUT_CSV="${PROJECT_SOURCE_DIR}/design/tokens/waterfall-lut.csv"
     ZARESCOPE_FONTS_DIR="${ZARESCOPE_FONTS_DIR}"
     ZARESCOPE_PRESETS_FILE="${PROJECT_SOURCE_DIR}/resources/presets.json"
-    ZARESCOPE_SAT_CATALOG_FILE="${PROJECT_SOURCE_DIR}/resources/sat_catalog.json")
+    ZARESCOPE_SAT_CATALOG_FILE="${PROJECT_SOURCE_DIR}/resources/sat_catalog.json"
+    ZARESCOPE_HELP_DIR="${PROJECT_SOURCE_DIR}/resources/help")
 # The golden pass list for test_sat.cpp, kept as a data file.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/data/golden_passes.txt" ZARESCOPE_GOLDEN_PASSES)
 string(REPLACE "\n" "\\n" ZARESCOPE_GOLDEN_PASSES_ESCAPED "${ZARESCOPE_GOLDEN_PASSES}")

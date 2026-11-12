@@ -34,6 +34,8 @@ struct Options {
     // chain without waiting for a real pass (best with --open on a
     // 137.9 MHz recording).
     std::optional<int> simulatePassSeconds;
+    // Print the menu bar's structure and exit (a quick check, no window).
+    bool printMenus = false;
 };
 
 class App {

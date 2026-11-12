@@ -29,9 +29,13 @@
 #include "dsp/AudioDemodulator.h"
 #include "sat/SatelliteService.h"
 #include "store/Journal.h"
+#include "ui/AboutView.h"
 #include "ui/AircraftView.h"
+#include "ui/AppMenuModel.h"
 #include "ui/DiscoveryView.h"
 #include "ui/FrequencyDisplay.h"
+#include "ui/Guide.h"
+#include "ui/HelpView.h"
 #include "ui/JournalView.h"
 #include "ui/SatelliteView.h"
 #include "ui/SpectrumView.h"
@@ -103,6 +107,19 @@ struct MainWindowServices {
         std::string detail;
     };
     std::function<void(std::function<void(const LocateResult&)> done)> locate;
+    // The menu bar (platform::AppMenu): install the menus, set what is
+    // enabled or checked each frame, and take the commands chosen.
+    std::function<void(const std::vector<platform::MenuSpec>&)> installMenu;
+    std::function<void(std::map<int, platform::MenuItemState>)> setMenuState;
+    std::function<std::vector<int>()> takeMenuCommands;
+    // Opens a web page; ends the app (as the window's close button does).
+    std::function<void(const std::string&)> openUrl;
+    std::function<void()> quit;
+    // The user guide in each language (null if its file couldn't be read),
+    // and what the About window shows.
+    const Guide* guideEnglish = nullptr;
+    const Guide* guideRomanian = nullptr;
+    AboutInfo about;
     // False for a run whose automatic recording was switched on by a test
     // flag (--simulate-pass): that switch isn't saved.
     bool saveAutoRecord = true;
@@ -139,6 +156,14 @@ private:
     void drawJournalArea(ImVec2 origin, ImVec2 size);
     void drawDiscoveryArea(ImVec2 origin, ImVec2 size);
     void openDevice(uint32_t index);
+    // The menu bar: rebuilt when the language changes, its state set and
+    // its commands handled every frame (before anything is drawn).
+    void updateMenu(ShellState& state);
+    void runCommand(Command command, ShellState& state);
+    void updateMenuState(const ShellState& state);
+    void exportJournal(bool json);
+    void drawHelpArea(ImVec2 origin, ImVec2 size);
+    void openSettingsFromMenu();
     // The banner text for how a pass ended.
     [[nodiscard]] std::string outcomeMessage(const app::PassOutcome& outcome) const;
     // False while a pass holds the stick: tuning, gain, device and recording
@@ -187,7 +212,14 @@ private:
     bool m_trackedByUser = false;                      // … started by the user, not a pass
     bool m_trackedDone = false;
     DiscoveryView m_discoveryView;
-    enum class Tab { Discover, Spectrum, Aircraft, Satellites, Journal };
+    HelpView m_helpView;
+    AboutView m_aboutView;
+    // The menu bar's language when it was last installed.
+    std::optional<Language> m_menuLanguage;
+    // Edit menu commands reach a text field as key presses: the keys go
+    // down on one frame and up on the next, so the field sees a press.
+    std::vector<ImGuiKey> m_keysToRelease;
+    enum class Tab { Discover, Spectrum, Aircraft, Satellites, Journal, Help };
     Tab m_tab = Tab::Spectrum;
     bool m_wasAdsbActive = false;
     // Station location being edited in Settings.

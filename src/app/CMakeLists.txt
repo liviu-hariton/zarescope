@@ -7,6 +7,7 @@
 #   Contents/Resources/presets.json          presets (resources/presets.json)
 #   Contents/Resources/sat_catalog.json      satellites (resources/sat_catalog.json)
 #   Contents/Resources/fonts/                Inter, JetBrains Mono and their licences
+#   Contents/Resources/help/                 the user guide (guide.en.md, guide.ro.md)
 #   Contents/Resources/Zarescope.icns        built from design/brand/app-icon
 #
 # The bundle lands at build/Zarescope.app.
@@ -28,6 +29,10 @@ set(ZARESCOPE_CATALOG_FILE "${PROJECT_SOURCE_DIR}/resources/sat_catalog.json")
 set_source_files_properties("${ZARESCOPE_TOKENS_FILE}" "${ZARESCOPE_PRESETS_FILE}" "${ZARESCOPE_CATALOG_FILE}"
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
+# The user guide, in each language (the Help tab reads it).
+file(GLOB ZARESCOPE_HELP_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/resources/help/*.md")
+set_source_files_properties(${ZARESCOPE_HELP_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/help")
+
 file(GLOB ZARESCOPE_FONT_FILES CONFIGURE_DEPENDS
     "${ZARESCOPE_FONTS_DIR}/*.ttf"
     "${ZARESCOPE_FONTS_DIR}/*-OFL.txt")
@@ -40,7 +45,8 @@ add_executable(Zarescope MACOSX_BUNDLE
     "${ZARESCOPE_TOKENS_FILE}"
     "${ZARESCOPE_PRESETS_FILE}"
     "${ZARESCOPE_CATALOG_FILE}"
-    ${ZARESCOPE_FONT_FILES})
+    ${ZARESCOPE_FONT_FILES}
+    ${ZARESCOPE_HELP_FILES})
 
 # The year of the build, for the copyright line. CMake honours
 # SOURCE_DATE_EPOCH here, so reproducible builds stay reproducible.
@@ -57,6 +63,7 @@ set_target_properties(Zarescope PROPERTIES
     MACOSX_BUNDLE_ICON_FILE "Zarescope.icns"
     MACOSX_BUNDLE_COPYRIGHT "© ${ZARESCOPE_BUILD_YEAR} Liviu Hariton. GPL-3.0-or-later.")
 
-target_compile_definitions(Zarescope PRIVATE ZARESCOPE_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(Zarescope PRIVATE ZARESCOPE_VERSION="${PROJECT_VERSION}"
+    ZARESCOPE_BUILD_YEAR=${ZARESCOPE_BUILD_YEAR})
 target_link_libraries(Zarescope PRIVATE zarescope_ui zarescope_appcore zarescope_store zarescope_os zarescope_platform)
 zarescope_set_warnings(Zarescope)

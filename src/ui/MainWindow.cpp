@@ -146,6 +146,8 @@ MainWindow::MainWindow(const theme::DesignTokens& tokens, const Typography& typo
         m_tab = Tab::Journal;
     } else if (m_services.initialTab == "discover") {
         m_tab = Tab::Discover;
+    } else if (m_services.initialTab == "help") {
+        m_tab = Tab::Help;
     }
     // The command line's station wins for this run; otherwise the saved one.
     if (m_services.station) {
@@ -362,6 +364,7 @@ void MainWindow::applyPreset(const device::Preset& preset) {
 void MainWindow::draw(ShellState& state) {
     m_ui.beginFrame(state.variant, state.language);
     pullData();
+    updateMenu(state);
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -391,9 +394,217 @@ void MainWindow::draw(ShellState& state) {
     drawPresetsPopup();
     drawSettingsPopup(state);
     ImGui::PopStyleVar(2);
+    if (const auto about = m_aboutView.draw(m_ui, m_services.about);
+        about.openWebsite && m_services.openUrl) {
+        m_services.openUrl(kWebsiteUrl);
+    }
 
     ImGui::End();
     saveSettingsIfChanged(state);
+}
+
+// --- Menu bar ------------------------------------------------------------------------
+
+void MainWindow::updateMenu(ShellState& state) {
+    // Keys pressed for an Edit command last frame go up now.
+    ImGuiIO& io = ImGui::GetIO();
+    for (const ImGuiKey key : m_keysToRelease) {
+        io.AddKeyEvent(key, false);
+    }
+    m_keysToRelease.clear();
+
+    if (m_menuLanguage != state.language && m_services.installMenu) {
+        std::vector<std::string> presetTitles;
+        for (const auto& preset : m_services.presets) {
+            const auto name = presetName(preset.id);
+            presetTitles.emplace_back(name ? text(*name, state.language) : preset.id);
+        }
+        m_services.installMenu(buildMenus(state.language, presetTitles));
+        m_menuLanguage = state.language;
+    }
+    if (m_services.takeMenuCommands) {
+        for (const int command : m_services.takeMenuCommands()) {
+            runCommand(static_cast<Command>(command), state);
+        }
+    }
+    updateMenuState(state);
+}
+
+void MainWindow::openSettingsFromMenu() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    m_openSettings = true;
+    m_settingsAnchor = ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - m_ui.spacing("16"),
+                              viewport->WorkPos.y + m_ui.size("topBar"));
+}
+
+void MainWindow::runCommand(Command command, ShellState& state) {
+    const bool running = m_status.state == ReceiverState::Running;
+    const int value = static_cast<int>(command);
+    if (value >= static_cast<int>(Command::PresetFirst)) {
+        const auto index = static_cast<size_t>(value - static_cast<int>(Command::PresetFirst));
+        if (index < m_services.presets.size() && userMayControl()) {
+            if (running && m_status.isDevice) {
+                applyPreset(m_services.presets[index]);
+                m_tab = m_services.presets[index].id == "adsb" ? Tab::Aircraft : Tab::Spectrum;
+            } else {
+                m_openDevices = true;  // a preset needs a stick to tune
+            }
+        }
+        return;
+    }
+    // Edit commands reach the focused text field as ⌘-key presses.
+    auto press = [&](ImGuiKey key, bool shift = false) {
+        if (!ImGui::GetIO().WantTextInput) {
+            return;
+        }
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddKeyEvent(ImGuiMod_Super, true);
+        if (shift) {
+            io.AddKeyEvent(ImGuiMod_Shift, true);
+            m_keysToRelease.push_back(ImGuiMod_Shift);
+        }
+        io.AddKeyEvent(key, true);
+        m_keysToRelease.push_back(key);
+        m_keysToRelease.push_back(ImGuiMod_Super);
+    };
+    auto setTextSize = [&](int step) {
+        constexpr std::array<const char*, 3> kSizes{"standard", "large", "larger"};
+        int current = 0;
+        for (int i = 0; i < 3; ++i) {
+            if (state.textSize == kSizes[static_cast<size_t>(i)]) {
+                current = i;
+            }
+        }
+        state.textSize = kSizes[static_cast<size_t>(std::clamp(step == 0 ? 0 : current + step, 0, 2))];
+    };
+    auto open = [&](const char* url) {
+        if (m_services.openUrl) {
+            m_services.openUrl(url);
+        }
+    };
+    switch (command) {
+    case Command::None:
+    case Command::PresetFirst: break;
+    case Command::About: m_aboutView.open(); break;
+    case Command::Settings: openSettingsFromMenu(); break;
+    case Command::Quit:
+        if (m_services.quit) {
+            m_services.quit();
+        }
+        break;
+    case Command::ConnectReceiver:
+        if (userMayControl()) {
+            m_openDevices = true;
+        }
+        break;
+    case Command::OpenRecording:
+        if (userMayControl()) {
+            openRecording();
+        }
+        break;
+    case Command::ToggleRecording:
+        if (running && userMayControl()) {
+            toggleRecording();
+        }
+        break;
+    case Command::CloseSource:
+        if (running && userMayControl()) {
+            m_services.receiver->close();
+        }
+        break;
+    case Command::ExportCsv: exportJournal(false); break;
+    case Command::ExportJson: exportJournal(true); break;
+    case Command::CloseWindow:
+        // The window in front: the About window if it's open, else the app's.
+        if (m_aboutView.isOpen()) {
+            m_aboutView.close();
+        } else if (m_services.quit) {
+            m_services.quit();
+        }
+        break;
+    case Command::Undo: press(ImGuiKey_Z); break;
+    case Command::Redo: press(ImGuiKey_Z, true); break;
+    case Command::Cut: press(ImGuiKey_X); break;
+    case Command::Copy: press(ImGuiKey_C); break;
+    case Command::Paste: press(ImGuiKey_V); break;
+    case Command::SelectAll: press(ImGuiKey_A); break;
+    case Command::ShowDiscover: m_tab = Tab::Discover; break;
+    case Command::ShowSpectrum: m_tab = Tab::Spectrum; break;
+    case Command::ShowAircraft: m_tab = Tab::Aircraft; break;
+    case Command::ShowSatellites: m_tab = Tab::Satellites; break;
+    case Command::ShowJournal: m_tab = Tab::Journal; break;
+    case Command::ShowHelp: m_tab = Tab::Help; break;
+    case Command::HelpShortcuts:
+        m_tab = Tab::Help;
+        m_helpView.jumpTo("shortcuts");
+        break;
+    case Command::BiggerText: setTextSize(+1); break;
+    case Command::SmallerText: setTextSize(-1); break;
+    case Command::StandardText: setTextSize(0); break;
+    case Command::DarkTheme: state.variant = theme::ThemeVariant::Dark; break;
+    case Command::LightTheme: state.variant = theme::ThemeVariant::Light; break;
+    case Command::ToggleAutoRecord:
+        if (m_services.automation != nullptr) {
+            m_services.automation->setEnabled(!m_automation.enabled);
+        }
+        break;
+    case Command::CheckSatDump:
+        if (m_services.automation != nullptr) {
+            m_services.automation->checkSatDump();
+        }
+        break;
+    case Command::Website: open(kWebsiteUrl); break;
+    case Command::SourceCode: open(kSourceUrl); break;
+    case Command::ReportProblem: open(kIssuesUrl); break;
+    }
+}
+
+// What the menus show when opened: disabled (not hidden) when a command
+// can't run, checked for the current tab, theme and switches.
+void MainWindow::updateMenuState(const ShellState& state) {
+    if (!m_services.setMenuState) {
+        return;
+    }
+    const bool running = m_status.state == ReceiverState::Running;
+    const bool control = userMayControl();
+    const bool typing = ImGui::GetIO().WantTextInput;
+    std::map<int, platform::MenuItemState> menu;
+    auto set = [&](Command command, bool enabled, bool checked = false, std::string title = {}) {
+        menu[static_cast<int>(command)] = {enabled, checked, std::move(title)};
+    };
+    const bool recording = m_recording.state != RecorderState::Idle;
+    set(Command::ConnectReceiver, control);
+    set(Command::OpenRecording, control);
+    set(Command::ToggleRecording, running && control && m_recording.state != RecorderState::Finishing,
+        false,
+        cstr(m_ui.tr(recording ? StringId::MenuStopRecording : StringId::MenuStartRecording)));
+    set(Command::CloseSource, running && control, false,
+        cstr(m_ui.tr(m_status.isDevice || !running ? StringId::MenuCloseReceiver
+                                                   : StringId::MenuCloseRecording)));
+    const bool journal = m_services.journal != nullptr && m_journal.open;
+    set(Command::ExportCsv, journal);
+    set(Command::ExportJson, journal);
+    for (const Command edit : {Command::Undo, Command::Redo, Command::Cut, Command::Copy,
+                               Command::Paste, Command::SelectAll}) {
+        set(edit, typing);
+    }
+    set(Command::ShowDiscover, true, m_tab == Tab::Discover);
+    set(Command::ShowSpectrum, true, m_tab == Tab::Spectrum);
+    set(Command::ShowAircraft, true, m_tab == Tab::Aircraft);
+    set(Command::ShowSatellites, true, m_tab == Tab::Satellites);
+    set(Command::ShowJournal, true, m_tab == Tab::Journal);
+    set(Command::ShowHelp, true, m_tab == Tab::Help);
+    set(Command::BiggerText, state.textSize != "larger");
+    set(Command::SmallerText, state.textSize != "standard");
+    set(Command::StandardText, state.textSize != "standard");
+    set(Command::DarkTheme, true, state.variant == theme::ThemeVariant::Dark);
+    set(Command::LightTheme, true, state.variant == theme::ThemeVariant::Light);
+    set(Command::ToggleAutoRecord, m_services.automation != nullptr, m_automation.enabled);
+    set(Command::CheckSatDump, m_services.automation != nullptr);
+    for (size_t i = 0; i < m_services.presets.size(); ++i) {
+        menu[static_cast<int>(Command::PresetFirst) + static_cast<int>(i)] = {control, false, {}};
+    }
+    m_services.setMenuState(std::move(menu));
 }
 
 void MainWindow::saveSettingsIfChanged(const ShellState& state) {
@@ -757,6 +968,7 @@ void MainWindow::drawBody() {
     switch (m_tab) {
     case Tab::Discover: drawDiscoveryArea(areaOrigin, areaSize); break;
     case Tab::Journal: drawJournalArea(areaOrigin, areaSize); break;
+    case Tab::Help: drawHelpArea(areaOrigin, areaSize); break;
     case Tab::Aircraft:
         if (running) {
             drawAircraftArea(areaOrigin, areaSize);
@@ -850,12 +1062,13 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
         std::string label;
         StringId tip;
     };
-    const std::array<TabEntry, 5> tabs{{
+    const std::array<TabEntry, 6> tabs{{
         {Tab::Discover, cstr(m_ui.tr(StringId::TabDiscover)), StringId::TipTabDiscover},
         {Tab::Spectrum, cstr(m_ui.tr(StringId::TabSpectrum)), StringId::TipTabSpectrum},
         {Tab::Aircraft, aircraftLabel, StringId::TipTabAircraft},
         {Tab::Satellites, cstr(m_ui.tr(StringId::TabSatellites)), StringId::TipTabSatellites},
         {Tab::Journal, cstr(m_ui.tr(StringId::TabJournal)), StringId::TipTabJournal},
+        {Tab::Help, cstr(m_ui.tr(StringId::TabHelp)), StringId::TipTabHelp},
     }};
     const float rule = m_ui.tokens().border("focus").value_or(2.0F);
     float x = origin.x + pad;
@@ -899,6 +1112,35 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
     return tabHeight + m_ui.spacing("8");
 }
 
+// Asks where to save, then exports what the Journal tab shows (its filter).
+void MainWindow::exportJournal(bool json) {
+    if (m_services.journal == nullptr || !m_services.chooseExportFile) {
+        return;
+    }
+    const std::string name =
+        "zarescope-journal-" +
+        std::format("{:%F}", std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now())) +
+        (json ? ".json" : ".csv");
+    if (auto file = m_services.chooseExportFile(name)) {
+        m_services.journal->exportTo(*file, json);
+    }
+}
+
+void MainWindow::drawHelpArea(ImVec2 origin, ImVec2 size) {
+    const Guide* guide = m_ui.language() == Language::Romanian ? m_services.guideRomanian
+                                                                : m_services.guideEnglish;
+    if (guide == nullptr) {
+        guide = m_services.guideEnglish;  // better than nothing
+    }
+    const std::string footer = "Zarescope " + m_services.versionText;
+    const auto actions = m_helpView.draw(m_ui, ImVec2(origin.x + m_ui.spacing("16"), origin.y),
+                                         ImVec2(size.x - 2.0F * m_ui.spacing("16"), size.y),
+                                         guide, footer);
+    if (actions.openWebsite && m_services.openUrl) {
+        m_services.openUrl(kWebsiteUrl);
+    }
+}
+
 void MainWindow::drawJournalArea(ImVec2 origin, ImVec2 size) {
     const float pad = m_ui.spacing("16");
     const auto actions =
@@ -911,14 +1153,8 @@ void MainWindow::drawJournalArea(ImVec2 origin, ImVec2 size) {
     if (actions.filter) {
         journal->setFilter(*actions.filter);
     }
-    if (actions.exportJson && m_services.chooseExportFile) {
-        const std::string name = "zarescope-journal-" +
-                                 std::format("{:%F}", std::chrono::floor<std::chrono::days>(
-                                                          std::chrono::system_clock::now())) +
-                                 (*actions.exportJson ? ".json" : ".csv");
-        if (auto file = m_services.chooseExportFile(name)) {
-            journal->exportTo(*file, *actions.exportJson);
-        }
+    if (actions.exportJson) {
+        exportJournal(*actions.exportJson);
     }
     if (actions.reveal && m_services.reveal) {
         m_services.reveal(*actions.reveal);

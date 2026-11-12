@@ -199,3 +199,28 @@ From top to bottom:
 - Status is never conveyed by colour alone.
 - The waterfall ramp is safe for colour vision deficiency.
 - Hit targets are at least 44 px where a control stands alone.
+
+## 11. Menu bar, Help and About (added 2026-11-12)
+
+- **Menu bar (macOS):** native, at the top of the screen like any Mac app's, so every command and its shortcut can be found there.
+  - **Zarescope:** About, Settings… ⌘,, Hide, Hide Others, Show All, Quit ⌘Q.
+  - **File:** Connect Receiver… ⇧⌘K, Open Recording… ⌘O, Start/Stop Recording ⇧⌘R, Close Receiver/Recording, Export Journal as CSV… / JSON…, Close Window ⌘W.
+  - **Edit:** Undo, Redo, Cut, Copy, Paste, Select All, for the text fields.
+  - **View:** the six tabs ⌘1–⌘6 (the current one checked), Bigger / Smaller / Standard Text ⌘+ ⌘- ⌘0, Dark / Light Theme, Enter Full Screen ⌃⌘F.
+  - **Receiver:** Tune To › the presets, Record and Decode Passes Automatically (checked when on), Look for SatDump Again.
+  - **Window:** Minimize ⌘M, Zoom, Bring All to Front.
+  - **Help:** Zarescope Help ⌘?, Keyboard Shortcuts, the website, the source code, Report a Problem….
+  - Items are disabled, not hidden, when they can't run; during a pass the receiver commands are disabled. Title Case in English, as macOS menus are; sentence case in Romanian.
+- **Help (the last tab; ⌘?):** a reading page with one 580-px measure (about 75 characters).
+  - An "On this page" rail (240 px, caption label, items in the label style) stays fixed on the left and marks the section being read with accent/soft; clicking scrolls there.
+  - Sections open with 48 px above a heading and 12 below. Steps are numbered because their order matters; other lists are bullets. Label/explanation rows (180-px label) have hairlines between them.
+  - The version and a Zarescope Website button close the page under a hairline.
+  - Scrolls from the keyboard: arrows, Page Up/Down, Space, Home/End.
+  - The text comes from `resources/help/guide.<language>.md`.
+- **About Zarescope (Zarescope menu):** a 400-px modal with a 32-px padding and the lg radius, centred over the app, the rest dimmed. Close, Esc or ⌘W close it.
+  - A centred column: the full logo at 80 px, "Zarescope" in the title style, the version, a faint mono build line (macOS version, arm64, Dear ImGui).
+  - One sentence on what the app is, and the receive-only note with its success-coloured check.
+  - "Project page" and "Copy version info" (which confirms with "Copied" and a check).
+  - Under a hairline, the licence, the credits and "© 2026 Liviu Hariton and contributors" in caption-size faint text, each wrapped line centred on its own. The copyright becomes a range, such as "2026–2028", from the build year.
+  - A primary Close button.
+

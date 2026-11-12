@@ -58,6 +58,8 @@ Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as
 
 **A copy for another Mac:** `tools/package.sh` builds, signs (ad hoc) and checks a Release `Zarescope.app` and packs it as a `.zip` and a `.dmg` in `build-release/dist/`; [docs/RELEASE.md](docs/RELEASE.md) explains how to open it there the first time.
 
+The user guide is in the app (Help tab, ⌘?) and in [resources/help](resources/help/guide.en.md). Every command is in the macOS menu bar with its shortcut; `--print-menus` prints the structure.
+
 Run from a terminal to see start-up errors: `build/Zarescope.app/Contents/MacOS/Zarescope`.
 
 The tests need no receiver, window or GPU. With a stick plugged in, `build/tests/zarescope_hardware_tests` checks it: what it claims to be, whether its tuner agrees, and whether it streams at the requested rate. Warnings are errors in Zarescope's own code; pass `-DZARESCOPE_WERROR=OFF` to relax that while experimenting.
