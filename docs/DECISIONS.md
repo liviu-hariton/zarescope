@@ -156,7 +156,7 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - The dBFS labels, the frequency axis under the waterfall and the time labels are drawn by `SpectrumView`.
   - ImPlot's colours come from tokens (`PlotTheme.cpp`).
 - **Why.** The spectrum and waterfall must share exact pixel columns, and the design puts the frequency axis below the waterfall. ImPlot's own axis gutter would shift the plot against the waterfall.
-- **Rejected.** Drawing the spectrum entirely by hand: ImPlot is the stack's choice and handles lines and fills well.
+- **Rejected.** Drawing the spectrum entirely by hand: ImPlot is the stack's choice (DEPENDENCIES.md) and handles lines and fills well.
 
 ## 2026-11-11 — The level range fits the signal at first
 
@@ -280,7 +280,7 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - Success means "at least one PNG came out", not the exit code.
   - Links are resolved (`std::filesystem::canonical`) before running SatDump.
   - Recordings are given to SatDump as they are (`cu8`); there is no conversion.
-- **Rejected.** SatDump's live mode, which would take the stick from us. In v1 SatDump runs on our file after LOS.
+- **Rejected.** SatDump's live mode, which would take the stick from us. In v1 SatDump runs on our file after LOS (ARCHITECTURE.md).
 
 ## 2026-11-12 — Pass recordings: 1.024 MS/s, on the downlink frequency, AGC when we open the stick
 

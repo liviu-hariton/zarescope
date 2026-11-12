@@ -7,4 +7,5 @@
 <path d="M10.5 46.6C16.2 34.24 24.96 25.7 34.84 21.92" stroke="#0B0E1A" stroke-width="3.5"/>
 <path d="M34.84 21.92C41.42 19.4 48.5 19 55.5 21" stroke="#0B0E1A" stroke-width="3.5" stroke-dasharray="0.1 6.4"/>
 </g>
-<circle cx="34.84" cy="21.92" r="5.5" fill="#0B0E1A"/></svg>
+<circle cx="34.84" cy="21.92" r="5.5" fill="#0B0E1A"/>
+</svg>

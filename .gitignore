@@ -11,7 +11,6 @@ cmake-build-*/
 # macOS
 .DS_Store
 
-
 # Large IQ recordings never go into git (tests/data keeps only small files)
 *.cu8
 *.cs8

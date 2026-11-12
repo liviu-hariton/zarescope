@@ -15,7 +15,7 @@ design/
   icons/                     12 line icons, 24 grid, currentColor
 ```
 
-Fonts are not bundled. Download the official static TTFs (OFL): Inter (rsms.me/inter) and JetBrains Mono (jetbrains.com/lp/mono). Put them in `assets/fonts/`.
+Fonts are not part of this package: the app ships the official static TTFs (OFL) of Inter and JetBrains Mono in `resources/fonts/`.
 
 ---
 
