@@ -8,7 +8,7 @@
 import "../styles/global.css";
 import Icon from "../components/Icon.astro";
 import { routes, t, type Lang, type PageId } from "../i18n/ui";
-import { copyrightYears, issuesUrl, repoUrl } from "../data/site";
+import { beerUrl, copyrightYears, issuesUrl, repoUrl } from "../data/site";
 
 interface Props {
   lang: Lang;
@@ -19,6 +19,7 @@ interface Props {
   /** The same content as Markdown (the guide), announced with rel="alternate". */
   markdown?: string;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** Extra tags for the head (the download-started page's no-JavaScript refresh). */
 }
 const { lang, page, title: pageTitle, description: pageDescription, noindex = false, markdown, jsonLd } = Astro.props;
 const title = pageTitle.includes("Zarescope") || pageTitle.length + 12 > 65 ? pageTitle : `${pageTitle} · Zarescope`;
@@ -77,6 +78,7 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
   <meta name="twitter:image" content={ogImage} />
   {markdown && <link rel="alternate" type="text/markdown" href={markdown} />}
   {ld && <script type="application/ld+json" set:html={ld} />}
+  <slot name="head" />
 </head>
 <body>
   <a class="skip" href="#main">{s.skip}</a>
@@ -90,7 +92,7 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
       <nav aria-label={lang === "ro" ? "Principal" : "Main"}>
         <ul>
           {nav.map((n) => (
-            <li><a href={n.href} aria-current={n.id === page ? "page" : undefined}>{n.label}</a></li>
+            <li><a href={n.href} aria-current={n.id === page || (n.id === "download" && page === "started") ? "page" : undefined}>{n.label}</a></li>
           ))}
         </ul>
       </nav>
@@ -120,6 +122,8 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
         </a>
         <p>{s.footer.tagline}</p>
         <p class="faint">{s.footer.receiveOnly}</p>
+        <p class="beer-note">{s.footer.beerNote}</p>
+        <a class="beer" href={beerUrl} rel="noopener"><Icon name="beer" size={17} />{s.footer.beer}</a>
       </div>
       <ul class="foot-links">
         <li><a href={r.download}>{s.nav.download}</a></li>
@@ -219,6 +223,14 @@ const ogImage = new URL(`/og-${lang}.png`, site).href;
   .foot-links a { color: var(--text-2); text-decoration: none; font-size: 15px; }
   .foot-links a:hover { color: var(--text); text-decoration: underline; }
   .with-mark { display: inline-flex; align-items: center; gap: 7px; }
+  .foot-brand .beer-note { margin-top: var(--s4); font-size: 14px; color: var(--text-3); }
+  .beer {
+    display: inline-flex; align-items: center; gap: 8px; height: 38px; margin-top: var(--s2); padding: 0 14px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--text); text-decoration: none;
+    font: 500 15px/1 var(--sans); transition: background-color var(--fast) var(--ease);
+  }
+  .beer :global(svg) { color: var(--accent); }
+  .beer:hover { background: var(--hover); color: var(--text); }
   .foot-small { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s2) var(--s5); border-top: 1px solid var(--border); padding-top: var(--s4); font-size: 13px; color: var(--text-3); }
   @media (max-width: 640px) { .foot-inner { grid-template-columns: 1fr; } }
   .to-top {

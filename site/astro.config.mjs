@@ -12,7 +12,8 @@ export default defineConfig({
   integrations: [
     sitemap({
       i18n: { defaultLocale: "en", locales: { en: "en", ro: "ro" } },
-      filter: (page) => !/\/404\/$/.test(page),
+      // The download-started pages aren't for search results, and neither are the 404s.
+      filter: (page) => !/\/(started|a-inceput|404)\/$/.test(page),
     }),
   ],
   vite: {

@@ -1,0 +1,65 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// "Your download has started": every Download button on a computer lands here.
+// The page starts the disk image download from GitHub and, while it runs, shows
+// the one step macOS asks for the first time (the app isn't notarized), so the
+// warning doesn't come as a surprise, and what to do next. Not for search results.
+import Base from "../layouts/Base.astro";
+import { dmgName, dmgUrl } from "../data/site";
+import { routes, t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang);
+const p = s.startedPage;
+const d = s.downloadPage;
+---
+<Base lang={lang} page="started" title={p.title} description={p.description} noindex>
+  <!-- Without JavaScript the browser starts the download itself, after a second. -->
+  <noscript slot="head"><meta http-equiv="refresh" content={`1;url=${dmgUrl}`} /></noscript>
+  <div class="wrap page">
+    <header class="head">
+      <h1 class="page-title">{p.title}</h1>
+      <p class="lede">{p.lede(dmgName)}</p>
+    </header>
+
+    <section aria-labelledby="first">
+      <h2 id="first">{d.firstTitle}</h2>
+      <ol class="steps">{d.first.map((x) => <li>{x}</li>)}</ol>
+      <p class="sub">{d.why}</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">{p.nextTitle}</h2>
+      <p class="sub">{p.next} <a href={routes[lang].guide}>{p.nextLink}</a></p>
+      <p class="early">{s.early}</p>
+    </section>
+
+    <p class="retry">{p.retry} <a href={dmgUrl} data-dmg>{p.retryLink}</a></p>
+  </div>
+</Base>
+
+<style>
+  .head, section, .retry { max-width: 780px; }
+  .lede { color: var(--text-2); font-size: 20px; margin-top: var(--s4); max-width: 34em; }
+  section { margin-top: var(--s8); }
+  h2 { font-size: 24px; font-weight: 650; margin-bottom: var(--s4); }
+  .sub { color: var(--text-2); max-width: 36em; margin-top: var(--s4); }
+  .steps { list-style: none; counter-reset: step; padding: 0; border-top: 1px solid var(--border); }
+  .steps li { counter-increment: step; display: grid; grid-template-columns: 40px 1fr; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .steps li::before { content: counter(step) "."; color: var(--text-3); font-family: var(--mono); }
+  .early { margin-top: var(--s4); color: var(--text-2); font-size: 15px; padding-left: 18px; position: relative; }
+  .early::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 8px; height: 8px; border-radius: 50%; background: var(--pass); }
+  .retry { margin-top: var(--s8); font-size: 15px; color: var(--text-2); }
+</style>
+
+<script>
+  // Start the download when someone arrives from a Download button, but not when
+  // they come back to this page with Back or reload it.
+  const link = document.querySelector<HTMLAnchorElement>("[data-dmg]");
+  const arrival = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
+  if (link && arrival !== "back_forward" && arrival !== "reload") {
+    setTimeout(() => { location.href = link.href; }, 400);
+  }
+</script>

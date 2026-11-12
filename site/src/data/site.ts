@@ -22,6 +22,10 @@ export const dmgName = `Zarescope-${version}-arm64.dmg`;
 export const dmgUrl = `${repoUrl}/releases/download/v${version}/${dmgName}`;
 export const releasesUrl = `${repoUrl}/releases`;
 export const issuesUrl = `${repoUrl}/issues`;
+/** Where "Buy me a beer" leads (a plain link: nothing is loaded from there). */
+export const beerUrl = "https://www.buymeacoffee.com/liviuhariton";
+/** The RTL-SDR Blog's own page listing where to buy its sticks. */
+export const stickUrl = "https://www.rtl-sdr.com/buy-rtl-sdr-dvb-t-dongles/";
 export const firstPublished = 2026;
 export const copyrightYears = (() => {
   const now = new Date().getFullYear();

@@ -5,11 +5,11 @@
 // Romanian uses the comma-below letters (ș ț), never the cedilla forms.
 
 export type Lang = "en" | "ro";
-export type PageId = "home" | "download" | "guide" | "privacy";
+export type PageId = "home" | "download" | "started" | "guide" | "privacy";
 
 export const routes: Record<Lang, Record<PageId, string>> = {
-  en: { home: "/", download: "/download/", guide: "/guide/", privacy: "/privacy/" },
-  ro: { home: "/ro/", download: "/ro/descarca/", guide: "/ro/ghid/", privacy: "/ro/confidentialitate/" },
+  en: { home: "/", download: "/download/", started: "/download/started/", guide: "/guide/", privacy: "/privacy/" },
+  ro: { home: "/ro/", download: "/ro/descarca/", started: "/ro/descarca/a-inceput/", guide: "/ro/ghid/", privacy: "/ro/confidentialitate/" },
 };
 
 const en = {
@@ -27,6 +27,8 @@ const en = {
     tagline: "Listen to the sky. Free and open source, for the Mac.",
     privacy: "Privacy",
     issues: "Report a problem",
+    beerNote: "Zarescope is free. If it showed you something up there:",
+    beer: "Buy me a beer",
     noTracking: "No cookies, no trackers, nothing loaded from other sites.",
     receiveOnly: "Zarescope only receives. It never transmits.",
     copyright: (years: string) => `© ${years} Liviu Hariton and contributors · GPL-3.0-or-later`,
@@ -113,6 +115,24 @@ const en = {
     otherLink: "All releases",
     macTitle: "On a phone or tablet?",
     macText: "Zarescope runs on a Mac. Open this page on your Mac to download it, or send yourself the link.",
+    share: "Send the link",
+    copied: "Link copied",
+  },
+  startedPage: {
+    title: "Your download has started",
+    description: "Zarescope is downloading. How to open it the first time, and what to do next.",
+    lede: (file: string) => `${file}, about 3 MB, is on its way from GitHub. The first time you open it, macOS asks you to confirm once.`,
+    retry: "Download didn't start?",
+    retryLink: "Download it directly",
+    nextTitle: "Then, your first signal",
+    next: "Plug in the stick, open Zarescope, and follow Discover: set your location, connect the receiver, pick FM radio. For satellite pictures, install SatDump too.",
+    nextLink: "The full guide",
+  },
+  stick: {
+    name: "RTL-SDR Blog V3",
+    text: "The stick we recommend. An RTL2832U receiver with a temperature-compensated clock (TCXO), so weather satellites stay in tune as it warms up, sold with a dipole antenna kit that covers FM, air traffic, aircraft and satellites. Zarescope is developed with its sibling, the V4, now out of production.",
+    link: "Where to buy it (RTL-SDR Blog)",
+    alt: "A drawing of an RTL-SDR stick: a USB plug, a small case and an antenna socket.",
   },
   guidePage: {
     title: "User guide",
@@ -129,6 +149,7 @@ const en = {
       ["Your location", "Typed by you, or found by macOS when you click “Use my current location” (macOS asks your permission first). It is kept only in the app's settings on your Mac."],
       ["Recordings, images and the journal", "Stay on your Mac, in the data folder you choose. Nothing is uploaded."],
       ["SatDump", "A separate program you install; Zarescope runs it on your recordings, on your Mac."],
+      ["Buy me a beer", "The link opens buymeacoffee.com, where their privacy statement applies. This site loads nothing from there."],
     ] as [string, string][],
   },
   notFound: {
@@ -153,6 +174,8 @@ const ro: typeof en = {
     tagline: "Ascultă cerul. Gratuit și open source, pentru Mac.",
     privacy: "Confidențialitate",
     issues: "Raportează o problemă",
+    beerNote: "Zarescope e gratuit. Dacă ți-a arătat ceva acolo sus:",
+    beer: "Cumpără-mi o bere",
     noTracking: "Fără cookie-uri, fără urmărire, nimic încărcat de pe alte site-uri.",
     receiveOnly: "Zarescope doar recepționează. Nu transmite niciodată.",
     copyright: (years: string) => `© ${years} Liviu Hariton și contribuitorii · GPL-3.0-or-later`,
@@ -239,6 +262,24 @@ const ro: typeof en = {
     otherLink: "Toate versiunile",
     macTitle: "Ești pe telefon sau tabletă?",
     macText: "Zarescope merge pe Mac. Deschide pagina pe Mac ca să-l descarci sau trimite-ți linkul.",
+    share: "Trimite linkul",
+    copied: "Link copiat",
+  },
+  startedPage: {
+    title: "Descărcarea a început",
+    description: "Zarescope se descarcă. Cum îl deschizi prima dată și ce urmează.",
+    lede: (file: string) => `${file}, circa 3 MB, vine de pe GitHub. Prima dată când îl deschizi, macOS îți cere o confirmare.`,
+    retry: "Descărcarea n-a pornit?",
+    retryLink: "Descarcă-l direct",
+    nextTitle: "Apoi, primul tău semnal",
+    next: "Conectează stickul, deschide Zarescope și urmează Descoperă: setează-ți locația, conectează receptorul, alege radio FM. Pentru imagini din sateliți, instalează și SatDump.",
+    nextLink: "Ghidul complet",
+  },
+  stick: {
+    name: "RTL-SDR Blog V3",
+    text: "Stickul pe care îl recomandăm. Un receptor RTL2832U cu ceas compensat termic (TCXO), ca sateliții meteo să rămână acordați pe măsură ce se încălzește, vândut cu un kit de antenă dipol bun pentru FM, traficul aerian, avioane și sateliți. Zarescope e dezvoltat cu fratele lui, V4, ieșit între timp din producție.",
+    link: "De unde îl cumperi (RTL-SDR Blog)",
+    alt: "Desenul unui stick RTL-SDR: o mufă USB, o carcasă mică și conectorul de antenă.",
   },
   guidePage: {
     title: "Ghid de utilizare",
@@ -255,6 +296,7 @@ const ro: typeof en = {
       ["Locația ta", "O scrii tu sau o găsește macOS când apeși „Folosește locația mea actuală” (macOS îți cere întâi permisiunea). E păstrată doar în setările aplicației, pe Mac-ul tău."],
       ["Înregistrările, imaginile și jurnalul", "Rămân pe Mac-ul tău, în dosarul de date ales de tine. Nu se încarcă nimic."],
       ["SatDump", "Un program separat pe care îl instalezi tu; Zarescope îl rulează pe înregistrările tale, pe Mac-ul tău."],
+      ["Cumpără-mi o bere", "Linkul deschide buymeacoffee.com, unde se aplică declarația lor de confidențialitate. Acest site nu încarcă nimic de acolo."],
     ],
   },
   notFound: {

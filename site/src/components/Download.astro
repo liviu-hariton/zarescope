@@ -6,6 +6,7 @@
 import Base from "../layouts/Base.astro";
 import DownloadButton from "./DownloadButton.astro";
 import Icon from "./Icon.astro";
+import StickCard from "./StickCard.astro";
 import { releasesUrl, repoUrl, softwareJsonLd, version } from "../data/site";
 import { routes, t, type Lang } from "../i18n/ui";
 
@@ -30,11 +31,13 @@ const d = s.downloadPage;
     <section id="mac" class="mac" aria-labelledby="mac-title">
       <h2 id="mac-title">{d.macTitle}</h2>
       <p class="sub">{d.macText}</p>
+      <button type="button" class="btn btn-secondary" data-share hidden data-copied={d.copied}>{d.share}</button>
     </section>
 
     <section aria-labelledby="req">
       <h2 id="req">{d.reqTitle}</h2>
       <dl class="rows">{d.reqs.map(([k, v]) => <div class="row"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      <div class="stick-wrap"><StickCard lang={lang} /></div>
     </section>
 
     <section aria-labelledby="first">
@@ -73,5 +76,23 @@ const d = s.downloadPage;
   .steps li { counter-increment: step; display: grid; grid-template-columns: 40px 1fr; padding: 14px 0; border-bottom: 1px solid var(--border); }
   .steps li::before { content: counter(step) "."; color: var(--text-3); font-family: var(--mono); }
   .gh-link { white-space: nowrap; }
+  .stick-wrap { margin-top: var(--s6); }
   .gh-link :global(svg) { display: inline-block; vertical-align: -2px; margin-right: 5px; }
 </style>
+
+<script>
+  // "Send the link": the phone's share sheet where there is one (AirDrop,
+  // Messages, mail to yourself), otherwise copy the page's address. Hidden
+  // without JavaScript, where it couldn't work.
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-share]")) {
+    button.hidden = false;
+    const url = location.origin + location.pathname;
+    button.addEventListener("click", async () => {
+      try {
+        if (navigator.share) { await navigator.share({ title: document.title, url }); return; }
+        await navigator.clipboard.writeText(url);
+        button.textContent = button.dataset.copied ?? "";
+      } catch { /* the visitor closed the share sheet */ }
+    });
+  }
+</script>

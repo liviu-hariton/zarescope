@@ -1,0 +1,59 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The stick we recommend (download page, "What you need"): a drawing, its name,
+// why it, and a link to the RTL-SDR Blog's own page of where to buy it. The
+// drawing is ours, in the site's line style (USB plug, case, antenna socket,
+// a dipole arm), so nothing is copied or loaded from the seller.
+import Icon from "./Icon.astro";
+import { stickUrl } from "../data/site";
+import { t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const c = t(lang).stick;
+---
+<figure class="stick">
+  <div class="plate">
+    <svg viewBox="0 0 220 160" role="img" aria-label={c.alt}>
+      <!-- USB plug -->
+      <rect x="18" y="66" width="34" height="28" rx="3" class="metal" />
+      <rect x="26" y="74" width="18" height="5" rx="1" class="slot" />
+      <rect x="26" y="82" width="18" height="5" rx="1" class="slot" />
+      <!-- the case -->
+      <rect x="52" y="58" width="104" height="44" rx="9" class="case" />
+      <text x="104" y="84" class="label">RTL-SDR</text>
+      <circle cx="140" cy="70" r="2.4" class="led" />
+      <!-- SMA socket and the antenna's dipole arm -->
+      <rect x="156" y="70" width="14" height="20" rx="2" class="metal" />
+      <rect x="170" y="74" width="10" height="12" rx="2" class="metal" />
+      <path d="M180 80 L204 30" class="arm" />
+      <path d="M180 80 L204 130" class="arm dim" />
+    </svg>
+  </div>
+  <figcaption>
+    <h3 class="name">{c.name}</h3>
+    <p class="text">{c.text}</p>
+    <a class="vendor" href={stickUrl} rel="noopener">{c.link}<Icon name="arrow-up-right" size={15} /></a>
+  </figcaption>
+</figure>
+
+<style>
+  .stick { display: grid; grid-template-columns: 220px 1fr; gap: var(--s5); align-items: center; margin: 0; }
+  .plate { display: grid; place-items: center; aspect-ratio: 11 / 8; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+  .plate svg { width: 100%; height: auto; }
+  .case { fill: var(--raised); stroke: var(--border-strong); stroke-width: 1.5; }
+  .metal { fill: var(--hover); stroke: var(--text-3); stroke-width: 1.5; }
+  .slot { fill: var(--surface); }
+  .label { font: 600 12px/1 var(--mono); fill: var(--text-2); text-anchor: middle; letter-spacing: 0.04em; }
+  .led { fill: var(--live); }
+  .arm { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+  .arm.dim { opacity: 0.55; }
+  .name { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
+  .text { color: var(--text-2); margin-top: var(--s2); max-width: 36em; }
+  .vendor { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--s3); font-weight: 500; text-decoration: none; }
+  @media (max-width: 560px) {
+    .stick { grid-template-columns: 1fr; }
+    .plate { max-width: 260px; }
+  }
+</style>
