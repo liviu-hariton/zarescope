@@ -22,7 +22,8 @@ The output lands in `build-release/dist/Zarescope-<version>-arm64.zip` and `.dmg
    - it has the location entitlement (see below);
    - every resource read at start-up is in the bundle.
 6. **Pack.**
-   - The `.zip` is made with `ditto`, which keeps the signature.
+   - The bundle's extended attributes are cleared before signing, and both files are packed with `--norsrc --noextattr`. Download quarantine tags and Finder info from the build machine stay out of what users download; the signature doesn't need them. The script stops if the zip still holds an AppleDouble (`._`) entry.
+   - The `.zip` is made with `ditto`, which keeps the bundle and its signature intact.
    - The `.dmg` holds the app and a link to `/Applications`, to drag it across.
 
 ## Why there's nothing to embed
@@ -68,6 +69,8 @@ Decided on 2026-11-12: not now. When it is wanted, the steps are:
 3. `tools/deploy-site.sh` rebuilds the website, so its Download button names the new version, and copies it to zarescope.eu.
 
 Keep this order. The site takes its version from `CMakeLists.txt`, so deploying it before the release exists makes every Download button point to a file that isn't there yet.
+
+**Replacing a release's files** (a rebuilt package, same version): `gh release upload v<version> <dmg> <zip> --clobber`, then put the new SHA-256 values in the release notes (`gh release edit v<version> --notes-file …`). The site's links stay the same, so it needs no redeploy.
 
 ## The website
 

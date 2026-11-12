@@ -1,6 +1,6 @@
 # Zarescope architecture
 
-This describes what exists today (end of M4). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+This describes what exists today: version 0.10.0, with all of v1 (M0–M7). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
 
 ## Threads and data flow
 
@@ -208,18 +208,29 @@ PassAutomation::update(now, passes)
   - **Row resampling.** FFT bins are reduced to the texture width by taking the strongest bin per column, so narrow carriers survive.
   - **Level range.** It fits the first trace of each source (`suggestRange`). Changing it repaints the texture from the stored levels.
 - **Themes.** `applyTheme` (ImGui) and `applyPlotTheme` (ImPlot) map every colour slot to a token, and the native title bar follows through `platform::setWindowAppearance`.
+- **Text size** (100, 110 or 120 %). `applyInterfaceScale` tells Dear ImGui the window is that much smaller and its pixels that much denser, so every size, gap and plot grows together and the fonts are rasterized sharp at the new density. Mouse positions already queued for the frame are converted too, which is why input trickling is off.
+
+## macOS integration (`src/platform/macos`)
+
+- **Menu bar.** `ui::buildMenus` (`AppMenuModel`) describes the menus as data: titles, shortcuts, command ids, in English and Romanian. `platform::AppMenu` builds a native `NSMenu` from it; GLFW's default menu is turned off. A chosen item is queued and read by the window on its next frame; `validateMenuItem` reads the enabled and checked state the window publishes every frame. Edit commands (copy, paste, select all) reach ImGui's text fields as ⌘-key presses. `--print-menus` prints the structure without opening a window.
+- **Help and About.** The user guide is Markdown (`resources/help/guide.en.md`, `guide.ro.md`), read once at start-up and parsed by `ui::Guide` (a small subset that still reads well on GitHub: headings, paragraphs, bullets, numbered steps and two-column tables; `**bold**` and `` `code` `` marks are dropped). `HelpView` draws it with an "On this page" rail. About is a modal with the version, the system and the copyright years. A test keeps the two guides' sections in step.
+- **Location.** `platform::LocationFinder` asks Core Location once for "Use my current location" and calls back exactly once: a position, or why there isn't one (permission denied, Location Services off, or no fix). The hardened runtime needs the `personal-information.location` entitlement for it, and `Info.plist` carries the usage text.
+- **Notifications, file dialogs, opening links, keeping awake during a pass**: small functions behind `platform/` headers, each with its macOS implementation here.
 
 ## Start-up and frame loop
 
 `App`'s constructor runs these steps in order:
 
-1. GLFW and the window;
+1. GLFW (with its own menu bar off) and the window;
 2. the ImGui and ImPlot contexts;
-3. the paths, the tokens and the fonts;
-4. the themes;
-5. the `Receiver`;
-6. the `MainWindow`, given the receiver, the recordings folder (`~/Library/Application Support/Zarescope/recordings`) and the file dialog;
-7. the backends.
+3. the paths (`ZARESCOPE_HOME` replaces Application Support, for screenshots and tests), the tokens and the fonts;
+4. the settings, read once, and the store that writes them;
+5. the data folder and the journal;
+6. the `Receiver`;
+7. the satellite catalog, `SatelliteService` and `PassAutomation`;
+8. the location finder, the menu bar and the two user guides;
+9. the `MainWindow`, given all of these as services;
+10. the backends.
 
 Any failure throws, and `main()` prints the reason.
 

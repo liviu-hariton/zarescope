@@ -2,24 +2,21 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M7, packaging.** `tools/package.sh` makes a self-contained, ad-hoc signed `Zarescope.app` (zip and dmg) for other Apple Silicon Macs.
->
-> **M6, journal, Discovery and settings.**
-> - New here? The Discover tab walks you through it: set your location, connect a receiver, then pick FM radio, air traffic, aircraft on radar, amateurs, walkie-talkies or Meteor images, each with the antenna that helps.
-> - The Journal tab keeps every pass, image, aircraft (one row per day) and recording, with search and CSV/JSON export.
-> - Settings (location, theme, language, receiver defaults, data folder, automatic recording) are saved between runs.
->
-> **M5, automatic Meteor recording.**
-> - Turn on "Record and decode passes automatically" in the Satellites tab. At each Meteor-M pass the app tunes the stick, records until LOS, gives the receiver back, and has [SatDump](https://www.satdump.org) turn the recording into images (in `~/Library/Application Support/Zarescope/products/`).
-> - Passes are predicted for 48 hours from CelesTrak's orbits (M4), with a countdown, a polar plot and a notification before each pass.
-> - ADS-B (M3) is decoded at 1090 MHz and shown in a table and on a radar.
->
-> **M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
-> - Listen to wideband FM, narrowband FM or AM, with squelch and presets.
-> - Tune by typing, scrolling or clicking.
-> - Record raw IQ.
->
-> It has been built and tested on synthetic signals and recordings; the live checks wait for the development stick. See [docs/MILESTONES.md](docs/MILESTONES.md).
+## What it does
+
+- **Listen.** Live spectrum and waterfall; wideband FM, narrowband FM and AM, with squelch and presets. Tune by typing, scrolling or clicking; record raw IQ, or play a recording back.
+- **Aircraft.** ADS-B at 1090 MHz, decoded by Zarescope itself, in a table and on a radar around your station.
+- **Weather satellites.** Meteor-M passes predicted 48 hours ahead from CelesTrak's orbits, with a countdown, a polar plot and a notification. Turn on automatic recording and, at each pass, the app tunes the stick, records until the satellite sets and has [SatDump](https://www.satdump.org) turn the recording into images.
+- **Journal.** Every pass, image, aircraft (one row per day) and recording, with search and CSV/JSON export.
+- **Guidance.** The Discover tab says what to listen to and which antenna helps; the user guide is built in (Help, ⌘?). English and Romanian, dark and light.
+
+## Status
+
+**Version 0.10.0**: every v1 milestone (M0–M7) is built and tested on synthetic signals, recordings and a simulated satellite pass with the real SatDump. The checks with a live receiver are under way; [docs/MILESTONES.md](docs/MILESTONES.md) has the criterion-by-criterion state.
+
+## Download
+
+macOS 14 (Sonoma) or later, Apple Silicon: the `.dmg` from the [latest release](https://github.com/liviu-hariton/zarescope/releases/latest), or from [zarescope.eu/download](https://zarescope.eu/download/). The app isn't notarized yet, so macOS asks for confirmation the first time; [docs/RELEASE.md](docs/RELEASE.md#installing-on-another-mac) has the steps. For satellite images, also install SatDump: `brew install --cask satdump`.
 
 Zarescope only receives. It never transmits and never decodes encrypted or private communications.
 
@@ -29,7 +26,7 @@ Any RTL2832U dongle supported by librtlsdr: the RTL-SDR Blog V4 (development sti
 
 ## Building (macOS, Apple Silicon)
 
-You need the Xcode Command Line Tools, CMake ≥ 3.25 and Ninja. Every library (GLFW, Dear ImGui, ImPlot, KissFFT, librtlsdr, libusb, nlohmann/json, doctest) is downloaded by CMake at a pinned version and checked against its SHA-256, and linked statically: the app depends only on macOS itself.
+You need the Xcode Command Line Tools, CMake ≥ 3.25 and Ninja. Every library (GLFW, Dear ImGui, ImPlot, KissFFT, librtlsdr, libusb, miniaudio, sgp4, nlohmann/json, doctest) is downloaded by CMake at a pinned version and checked against its SHA-256, and linked statically: the app depends only on macOS itself.
 
 ```bash
 xcode-select --install
@@ -79,20 +76,23 @@ find src tests -name '*.cpp' -o -name '*.h' -o -name '*.mm' | xargs xcrun clang-
 ## Project layout
 
 ```
-src/app/            main() and the frame loop
-src/device/         sample sources (stick, file), the receiver pipeline, IQ recorder
+src/app/            main(), the frame loop, settings, pass automation
+src/device/         sample sources (stick, file), the receiver pipeline, IQ recorder, device arbiter
 src/dsp/            FFT, spectrum analyser, audio chain, lock-free queues
 src/decoders/adsb/  Mode S / ADS-B: CRC, CPR, demodulator, aircraft store
 src/audio/          sound output (miniaudio)
-src/sat/            satellite catalog, TLEs, SGP4, pass prediction
-src/ui/             the Dear ImGui screens, fonts, strings (EN + RO)
+src/sat/            satellite catalog, TLEs, SGP4, pass prediction, pass scheduler
+src/integrations/   SatDump, run as a separate process
+src/store/          the journal (SQLite)
+src/ui/             the Dear ImGui screens, menu model, user guide, fonts, strings (EN + RO)
 src/ui/theme/       design tokens → Dear ImGui style
-src/platform/       small interfaces; macos/ holds Metal and the macOS paths
-resources/fonts/    Inter and JetBrains Mono (SIL OFL 1.1, licences alongside)
+src/platform/       small interfaces; macos/ holds Metal, the menu bar, notifications, location, paths
+resources/          satellite catalog, presets, user guide (EN + RO), fonts (SIL OFL 1.1)
 design/             the design system: spec, tokens, waterfall LUT, logo, icons
 tests/              doctest unit tests; tests/hardware needs a stick
-tools/              developer tools (zarescope-synth)
-docs/               architecture, decisions, dependencies, file formats, milestones
+tools/              zarescope-synth, packaging, release, website capture and deploy scripts
+site/               the zarescope.eu website (Astro)
+docs/               architecture, decisions, dependencies, file formats, milestones, releasing
 ```
 
 Start with [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), then [docs/MILESTONES.md](docs/MILESTONES.md) and [docs/DECISIONS.md](docs/DECISIONS.md).

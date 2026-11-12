@@ -223,7 +223,7 @@ SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command 
   - Release build and tests;
   - strip, then ad-hoc signature with the hardened runtime over the whole bundle;
   - checks: system libraries only, no build-machine paths, arm64, resources present;
-  - `.zip` (ditto) and `.dmg` with an Applications link.
+  - `.zip` (ditto) and `.dmg` with an Applications link, both without this machine's extended attributes (the script fails if the zip carries any).
 - [x] `docs/RELEASE.md`: building, installing on another Mac (Gatekeeper's first-open steps), what the app writes, and the Developer ID and notarization steps, on hold by decision.
 
 **Acceptance.**
@@ -236,3 +236,16 @@ SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command 
 
 - Developer ID signing and notarization (on hold, 2026-11-12).
 - Opening `.cu8` files from Finder (a document type) isn't there yet.
+
+## After M7 — within v1 (0.9.0, 0.10.0) ✅ (2026-11-12)
+
+Additions asked for after the milestones, still v1 scope.
+
+- [x] **Readability (0.9.0).** A bigger type scale (body 15 px, nothing below 12 px) and taller controls and rows. Settings › Text size (100, 110 or 120 %) scales the whole interface, with sharp fonts. DECISIONS.md, 2026-11-12.
+- [x] **Use my current location (0.9.0).** Settings › Station asks macOS Location Services once; typing the coordinates still works.
+- [x] **Settings fit a short window (0.9.0).** Popovers scroll when the window is low, and Settings has a cog icon.
+- [x] **Native menu bar (0.10.0).** Every command with its shortcut, in English and Romanian, enabled and checked from the app's state.
+- [x] **User guide in the app (0.10.0).** The Help tab (⌘?) shows `resources/help/guide.en.md` / `guide.ro.md`, with an "On this page" rail.
+- [x] **About window (0.10.0).** Version and build line (copyable for bug reports), the receive-only note, the project page, licence and credits.
+- [x] **Website.** https://zarescope.eu, built from `site/` (Astro, EN and RO), with the app's screenshots, the user guide, the download page and a privacy page. docs/RELEASE.md, "The website".
+- [x] **First public release.** v0.10.0 on GitHub, with the `.dmg`, the `.zip` and their SHA-256.

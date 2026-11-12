@@ -8,7 +8,7 @@ Every third-party component, with its version, licence and reason. A new depende
 |---|---|---|---|---|
 | [Dear ImGui](https://github.com/ocornut/imgui) | 1.93.0, docking branch | MIT | The UI; docking for the later panel layout | FetchContent, built as `zs_imgui` (+ `zs_imgui_metal`) |
 | [GLFW](https://www.glfw.org) | 3.5.1 | zlib | Window, input and monitors on every platform | FetchContent |
-| [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | MIT | Design tokens, IQ sidecar files; later settings, the satellite catalog and presets | FetchContent (header-only) |
+| [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | MIT | Design tokens, IQ sidecar files, settings, the satellite catalog and presets | FetchContent (header-only) |
 | [ImPlot](https://github.com/epezent/implot) | 1.1 | MIT | The spectrum plot and its frequency axis | FetchContent, built as `zs_implot` |
 | [KissFFT](https://github.com/mborgerding/kissfft) | 131.1.0 | BSD-3-Clause | FFT behind `dsp::FftEngine` (vDSP may follow in v2) | FetchContent, `kiss_fft.c` only, as `zs_kissfft` |
 | [librtlsdr, RTL-SDR Blog fork](https://github.com/rtlsdrblog/rtl-sdr-blog) | V1.4.0 (2026-08) | GPL-2.0-or-later | Access to the RTL-SDR stick; this release recognises the Blog V4 (R828D) and V4 Lite (R828S) | FetchContent, the library and tuner sources built as static `zs_rtlsdr` (no pkg-config needed) |
@@ -33,13 +33,23 @@ Every third-party component, with its version, licence and reason. A new depende
 
 ## System frameworks (macOS)
 
-Cocoa, Foundation, Metal, QuartzCore, UniformTypeIdentifiers and UserNotifications are part of macOS and are linked from `src/platform/macos`. IOKit, CoreFoundation and Security come in through libusb, CoreAudio and AudioToolbox through miniaudio.
+Cocoa, CoreLocation, Foundation, Metal, QuartzCore, UniformTypeIdentifiers and UserNotifications are part of macOS and are linked from `src/platform/macos`. IOKit, CoreFoundation and Security come in through libusb, CoreAudio and AudioToolbox through miniaudio.
 
 ## External programs (not linked)
 
 | Program | Version checked | Licence | Why | How |
 |---|---|---|---|---|
 | [SatDump](https://www.satdump.org) | 1.2.2 | GPL-3.0 | Decodes Meteor-M LRPT recordings into images (delegated to it in v1) | The user installs it (`brew install --cask satdump`). Run as a separate process; found in `/Applications/SatDump.app`, `~/Applications`, Homebrew's bin or `PATH`. The app works without it and says how to install it. |
+
+## The website (`site/`, not part of the app)
+
+Installed by npm from `site/package.json` (versions locked in `site/package-lock.json`); used only to build the static zarescope.eu pages.
+
+| Component | Version | Licence | Why |
+|---|---|---|---|
+| [Astro](https://astro.build) | 7.4 | MIT | Static site generator: the pages, the screenshots' WebP sizes, the sitemap (`@astrojs/sitemap` 3.7) |
+| [sharp](https://sharp.pixelplumbing.com) | 0.35 | Apache-2.0 | Image conversion during the build |
+| [Fontsource](https://fontsource.org) Inter and JetBrains Mono (variable) | 5.3 | SIL OFL 1.1 | The same typefaces as the app, served from the site itself |
 
 ## Planned
 

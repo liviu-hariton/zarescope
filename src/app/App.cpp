@@ -272,8 +272,8 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    // No imgui.ini next to the app: window layout is fixed in M0. Settings
-    // will live in Application Support (M6).
+    // No imgui.ini next to the app: the window layout is fixed, and the
+    // settings live in settings.json (M6).
     io.IniFilename = nullptr;
     // applyInterfaceScale() converts each frame's queued mouse positions;
     // trickling would carry some over to the next frame and convert them twice.
