@@ -2,8 +2,9 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M4, satellites.**
-> - Meteor-M passes are predicted for 48 hours from CelesTrak's orbits, with a countdown, a polar plot and a notification before each pass.
+> **Status: M5, automatic Meteor recording.**
+> - Turn on "Record and decode passes automatically" in the Satellites tab. At each Meteor-M pass the app tunes the stick, records until LOS, gives the receiver back, and has [SatDump](https://www.satdump.org) turn the recording into images (in `~/Library/Application Support/Zarescope/products/`).
+> - Passes are predicted for 48 hours from CelesTrak's orbits (M4), with a countdown, a polar plot and a notification before each pass.
 > - ADS-B (M3) is decoded at 1090 MHz and shown in a table and on a radar.
 >
 > **M2, listening.** The app opens an RTL-SDR stick, or plays a recording, and shows the live spectrum and waterfall.
@@ -43,6 +44,8 @@ open build/Zarescope.app --args --open /tmp/adsb.cu8 --station 44.4268,26.1025
 # the next Meteor passes over a station:
 open build/Zarescope.app --args --station 44.4268,26.1025 --tab satellites
 ```
+
+For satellite images, install SatDump separately (`brew install --cask satdump`); Zarescope finds it in `/Applications` and runs it after each pass. Without it, everything else works and the Satellites tab says how to install it. To try the whole chain without waiting for a pass: `--open` a 137.9 MHz recording and add `--simulate-pass 60`.
 
 Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
 

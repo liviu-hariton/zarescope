@@ -267,3 +267,43 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 
 - **Decision.** Spectrum, Aircraft and Satellites are always reachable. Without a source, Spectrum and Aircraft show the empty state; Satellites works fully.
 - **Why.** Pass prediction needs only a station and TLEs. Planning a Meteor pass shouldn't require plugging in the stick first.
+
+## 2026-11-12 — SatDump 1.2.2's command line, checked on the machine
+
+- **Decision.** Decoding runs `satdump meteor_m2-x_lrpt baseband <file.cu8> <output dir> --samplerate <S/s> --baseband_format cu8 --dc_block`. The pipeline and `--dc_block` come from the catalog.
+- **Checked.**
+  - `satdump --help` prints the usage `satdump [pipeline_id] [input_level] [input_file] [output_file_or_directory]` and the options `--samplerate`, `--baseband_format [cf32/cs16/cs8/cu8]`, `--dc_block` and `--iq_swap`.
+  - `Resources/pipelines/Meteor-M.json` in the app bundle defines `meteor_m2-x_lrpt` ("METEOR M2-x LRPT 72k", 137.9 MHz primary, 137.1 MHz backup, default 1 MS/s) and `meteor_m2-x_lrpt_80k`.
+  - A run on noise: exit code 0 even with nothing decoded. The output folder holds `meteor_m2-x_lrpt.cadu`, `MSU-MR/product.cbor`, `dataset.json` and `telemetry.json`; images appear as PNGs under `MSU-MR/`.
+  - The Homebrew link `/opt/homebrew/bin/satdump` fails ("Couldn't load config file"). SatDump finds its resources through the path it was started by, so the real binary inside `SatDump.app` must be run.
+- **Consequences.**
+  - Success means "at least one PNG came out", not the exit code.
+  - Links are resolved (`std::filesystem::canonical`) before running SatDump.
+  - Recordings are given to SatDump as they are (`cu8`); there is no conversion.
+- **Rejected.** SatDump's live mode, which would take the stick from us. In v1 SatDump runs on our file after LOS.
+
+## 2026-11-12 — Pass recordings: 1.024 MS/s, on the downlink frequency, AGC when we open the stick
+
+- **Decision.** Recordings run at 1.024 MS/s (`recordSampleRateSps`), with the stick tuned exactly to the catalog frequency.
+- **Why.**
+  - **Sample rate.** SatDump's pipeline defaults to 1 MS/s. The RTL2832U makes 1.024 MS/s exactly (28.8 MHz / 28.125), while 1 MS/s is approximated. Either rate is far above the 72 k symbols/s OQPSK signal's ~120 kHz.
+  - **Tuning.** SatDump expects the signal centred. `--dc_block` removes the RTL-SDR's DC spike under it.
+  - **Gain.** The user's gain is kept if a stick was already open. Otherwise the tuner's AGC is used (no gain setting exists before M6).
+- **Size.** 2 MB/s, about 1.8 GB for a 15-min pass. The free space is checked before recording, with a 512 MiB margin.
+- **Rejected.** Tuning off-centre to dodge the DC spike: SatDump would then need a frequency shift we can't pass on its command line.
+
+## 2026-11-12 — After a decode: images kept, baseband deleted
+
+- **Decision.** The PNGs, `satdump.log` and `pass.json` go to `products/<YYYY-MM-DD_HHMMZ>_<satellite>/`. SatDump's scratch folder is deleted. The baseband is deleted when images came out and kept when none did.
+- **Why.** Unattended, a day of passes would fill about 10 GB with recordings nobody needs once decoded. A failed pass is worth keeping for another try.
+- **Rejected.** Keeping everything. That will be a Settings option (`AutomationConfig::keepBaseband`, M6).
+
+## 2026-11-12 — The pass automation runs on the UI thread's frame and only posts commands
+
+- **Decision.** `PassAutomation::update(now, passes)` is called every frame. It reads statuses and posts commands; SatDump runs on the runner's own thread.
+- **Why.**
+  - The receiver's commands already return at once, so nothing new has to be synchronised.
+  - The time comes in as a parameter, so tests drive a whole pass with a fake clock.
+  - The idle loop still wakes four times a second, and App Nap is held off while automatic recording is on, so passes start within a fraction of a second.
+- **Rejected.** A scheduler thread of its own, which would need locking around the receiver and the arbiter for no gain.
+

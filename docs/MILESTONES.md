@@ -154,4 +154,33 @@ This file records each milestone: what it delivers, its acceptance criteria, and
 **Left for later.**
 
 - The station location and minimum elevation aren't saved between runs yet (Settings, M6). The notification permission prompt appears the first time a pass is five minutes away.
-- The catalog's SatDump pipeline and recording rate are placeholders, checked in M5 against the installed SatDump.
+- The catalog's SatDump pipeline and recording rate are placeholders, checked in M5 against the installed SatDump. (Done in M5.)
+
+## M5 — Automatic recording and Meteor decoding 🟡 (built and tested on a simulated pass with the real SatDump; a real pass waits for the stick)
+
+SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command line, pipelines and output were checked on the machine before any code was written (`docs/DECISIONS.md`).
+
+- [x] `PassScheduler` (`src/sat`): which pass is due, from the catalog (active, LRPT downlink, pipeline, sample rate). It joins late while 2 min remain, gives overlapping passes to the higher one, and never repeats a pass. Tested with a fake clock.
+- [x] `DeviceArbiter` (`src/device`): Idle → Live → HandoffPending → External → Reclaiming. A pass outranks the user's live view; the user's tuning, gain, device and recording controls are locked during it. The handoff states are tested and wait for rtl_433 (v2).
+- [x] `SatDumpRunner` (`src/integrations`): runs `satdump <pipeline> baseband <file.cu8> <dir> --samplerate N --baseband_format cu8 [catalog options]` in its own process group, with a 30-min timeout. It saves the log without colours, copies the PNG images to `products/<date>_<satellite>/`, writes `pass.json`, and deletes the baseband after a successful decode.
+- [x] It detects a missing SatDump and shows `brew install --cask satdump` with a "Check again" button. The rest of the app is unaffected.
+- [x] `PassAutomation`: claim the stick, tune (or open it), record AOS → LOS with a disk-space check, give the receiver back as it was, decode. Each pass ends in an outcome banner and a notification.
+- [x] UI:
+  - the "Record and decode passes automatically" switch and SatDump's state in the Satellites tab;
+  - the next-pass card shows "Recorded automatically";
+  - banners for tuning, recording (with progress and Stop), saving, decoding (with SatDump's progress) and the result (Show in Finder / Show log).
+- [x] The app keeps App Nap off while automatic recording is on, and idle sleep off during a pass.
+- [x] `--simulate-pass SECONDS` runs the whole chain on a made-up pass.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| A simulated pass (fake clock + `FileSource` on a recording) triggers the recording and the decoding | ✅ `test_automation.cpp` runs it with a fake SatDump. In the app (`--open` on a 137.9 MHz recording, `--simulate-pass 60`), the real SatDump 1.2.2 ran on the 117 MB recording and reported no image, since it was noise, as expected. |
+| Live, a high pass produces an image with no intervention | ⏳ waits for the stick (and an antenna) |
+
+**Left for later.**
+
+- Automatic recording is off at every start, until Settings are saved (M6). The products aren't in a journal yet (M6); `pass.json` holds what the journal will need.
+- No real Meteor recording was available, so SatDump has decoded only noise through the app. The first real pass is the remaining check.
+- A Mac that sleeps misses passes. The app doesn't schedule wake-ups, which would need administrator rights.

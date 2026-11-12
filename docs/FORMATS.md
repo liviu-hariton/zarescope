@@ -107,6 +107,7 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
       "active": true,
       "downlinks": [ { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 } ],
       "satdumpPipeline": "meteor_m2-x_lrpt",
+      "satdumpArgs": ["--dc_block"],
       "recordSampleRateSps": 1024000
     }
   ]
@@ -119,8 +120,11 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
 | `name` | display name |
 | `active` | false = known but not scheduled |
 | `downlinks` | frequency (Hz), mode (`lrpt`, …) and channel width (Hz) of each transmitter |
-| `satdumpPipeline` | the SatDump pipeline that decodes a recording. **To be checked against `satdump --help` in M5** before use. |
-| `recordSampleRateSps` | sample rate for pass recordings. **Chosen in M5** from SatDump's documentation. |
+| `satdumpPipeline` | the SatDump pipeline that decodes a recording (checked against SatDump 1.2.2: `meteor_m2-x_lrpt`). Empty = not recorded. |
+| `satdumpArgs` | extra SatDump options, appended after `--samplerate N --baseband_format cu8` (optional) |
+| `recordSampleRateSps` | sample rate for pass recordings: 1024000 (docs/DECISIONS.md, 2026-11-12) |
+
+A satellite is recorded automatically when it is `active`, has a downlink with mode `lrpt`, a `satdumpPipeline` and a `recordSampleRateSps`.
 
 ## TLE cache (written and read)
 
@@ -137,5 +141,40 @@ SatDump and most SDR tools read this format as "cu8" / "u8 IQ".
 - **`tle`.** CelesTrak's text, as received.
 
 A damaged file is ignored, and the TLE is fetched again.
+
+## Pass products (written)
+
+One folder per pass in `~/Library/Application Support/Zarescope/products/`, named by AOS (UTC) and satellite: `2026-11-12_0330Z_Meteor-M_N2-4/`.
+
+- **Images.** SatDump's PNGs with their sub-folders (`MSU-MR/…png`).
+- **`satdump.log`.** SatDump's output with the ANSI colours removed.
+- **`pass.json`.** What was recorded and what came out of it:
+
+```json
+{
+  "satellite": "Meteor-M N2-3",
+  "noradId": 57166,
+  "aosUtc": "2026-11-12T07:05:30.712Z",
+  "losUtc": "2026-11-12T07:06:30.712Z",
+  "maxElevationDeg": 60.0,
+  "frequencyHz": 137900000,
+  "sampleRateSps": 1024000,
+  "recordedFromUtc": "2026-11-12T07:05:30.736Z",
+  "recordedUntilUtc": "2026-11-12T07:06:30.759Z",
+  "recordingBytes": 122814464,
+  "stoppedByUser": false,
+  "recording": "2026-11-12T070530Z_137900000Hz.cu8",
+  "decode": {
+    "satdumpVersion": "1.2.2",
+    "pipeline": "meteor_m2-x_lrpt",
+    "exitCode": 0,
+    "timedOut": false,
+    "error": "",
+    "images": ["MSU-MR/msu_mr_rgb_221.png"]
+  }
+}
+```
+
+The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted when `images` isn't empty, and kept otherwise. The journal (M6) will index these folders.
 
 ## Coming next

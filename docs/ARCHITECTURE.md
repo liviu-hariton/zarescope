@@ -40,12 +40,15 @@ These rules hold:
 |---|---|---|
 | `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, the filters, `AudioDemodulator`, `SignalGenerator`, cu8 conversion | KissFFT |
 | `zarescope_adsb` | `ModeS`, `Cpr`, `ModeSDemodulator`, `AircraftStore`, `Encoder` | `zarescope_dsp` |
-| `zarescope_sat` | `SatCatalog`, `Orbit` (TLE, propagator, passes), `SatelliteService` | sgp4, libcurl (system), nlohmann/json, `zarescope_device` (timestamps) |
+| `zarescope_sat` | `SatCatalog`, `Orbit` (TLE, propagator, passes), `SatelliteService`, `PassScheduler` | sgp4, libcurl (system), nlohmann/json, `zarescope_device` (timestamps) |
 | `zarescope_audio` | `AudioOutput`, `AudioRing` | miniaudio |
 | `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Presets`, `Receiver` | `zarescope_dsp`, `zarescope_audio`, librtlsdr (static), libusb (static), nlohmann/json |
+| `zarescope_os` | `runProcess` (POSIX), where external tools live (macOS) | — |
+| `zarescope_integrations` | `SatDumpRunner` | `zarescope_os`, `zarescope_device`, nlohmann/json |
+| `zarescope_automation` | `PassAutomation` (`src/app`) | `zarescope_device`, `zarescope_sat`, `zarescope_integrations` |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
 | `zarescope_ui` | the screens, the ImGui and ImPlot themes, fonts, strings, formats | `zarescope_theme`, `zarescope_device`, Dear ImGui, ImPlot |
-| `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
+| `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog, notifications, Finder and keep-awake | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
 | `Zarescope` | the `.app` bundle | all of the above |
 | `zarescope_tests` | doctest tests, run by CTest | `zarescope_ui` |
 | `zarescope_hardware_tests` | tests that need a stick, run by hand | `zarescope_device` |
@@ -127,7 +130,8 @@ Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume 
 
 ## Satellites (`src/sat`)
 
-- **SatCatalog.** The satellites, their downlinks and, later, their SatDump pipeline, from `resources/sat_catalog.json`.
+- **SatCatalog.** The satellites, their downlinks, their SatDump pipeline and options, and the recording rate, from `resources/sat_catalog.json`.
+- **PassScheduler.** Pure logic with the time passed in: which pass is due, which is next, and which are done.
 - **Orbit.**
   - `parseTle` checks the lines' length, their start digits and checksums, and that SGP4 accepts them.
   - `Propagator` wraps libsgp4: TEME state, and look angles from the station.
@@ -138,6 +142,30 @@ Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume 
   - **Downloads.** It fetches stale TLEs (older than 12 h) through libcurl, HTTPS only, with answers capped at 16 KiB.
   - **Predictions.** It predicts 48 h of passes when its inputs change, and every 10 minutes.
 - **Notifications.** `MainWindow` announces each pass five minutes before AOS through `platform::notify`.
+
+## Automatic pass recording (M5)
+
+```
+UI thread, every frame                       runner thread         SatDump process
+PassAutomation::update(now, passes)
+  PassScheduler.due ─▶ DeviceArbiter.claimForPass
+  Receiver: tune / open ─▶ startRecording (disk check)
+  … LOS ─▶ stopRecording ─▶ restore ─▶ releasePass
+  SatDumpRunner.submit ─────────────────────▶ runProcess ──────────▶ satdump … baseband …
+                                              copy PNGs, pass.json ◀─ exit
+  collect result (mutex slot) ◀──────────────  callback (exactly once)
+```
+
+- **`device::DeviceArbiter`.** Who owns the stick. The pass outranks the user; `MainWindow` locks tuning, gain, device and recording while the scheduler owns it, and mutes the demodulator.
+- **`integrations::SatDumpRunner`.** One job at a time on its own thread.
+  - `platform::runProcess` (POSIX `posix_spawn`, its own process group, a timeout, a cancel flag) runs SatDump.
+  - The search for SatDump (`platform::satDumpCandidates`, links resolved) also runs on that thread.
+- **`app::PassAutomation`.**
+  - **Phases.** Waiting → Preparing → Recording → Finishing → Decoding.
+  - **Inputs.** The receiver's status (read each frame), the arbiter, the scheduler, the runner.
+  - **Output.** `AutomationStatus` for the UI. The last outcome carries a typed `PassFailure`, worded in both languages by the UI.
+  - **Library.** It lives in `zarescope_automation` so the tests can drive it.
+- **`platform::KeepAwake`.** NSProcessInfo activities: no App Nap while waiting, no idle sleep during a pass.
 
 ## The UI (`src/ui`)
 

@@ -34,6 +34,12 @@ Every third-party component, with its version, licence and reason. A new depende
 
 Cocoa, Foundation, Metal, QuartzCore, UniformTypeIdentifiers and UserNotifications are part of macOS and are linked from `src/platform/macos`. IOKit, CoreFoundation and Security come in through libusb, CoreAudio and AudioToolbox through miniaudio.
 
+## External programs (not linked)
+
+| Program | Version checked | Licence | Why | How |
+|---|---|---|---|---|
+| [SatDump](https://www.satdump.org) | 1.2.2 | GPL-3.0 | Decodes Meteor-M LRPT recordings into images (delegated to it in v1) | The user installs it (`brew install --cask satdump`). Run as a separate process; found in `/Applications/SatDump.app`, `~/Applications`, Homebrew's bin or `PATH`. The app works without it and says how to install it. |
+
 ## Planned
 
-These come from the plan and are added (with their rows above) in the milestone that needs them: SQLite (the journal, M6). SatDump is an external program the user installs; it is not linked.
+These come from the plan and are added (with their rows above) in the milestone that needs them: SQLite (the journal, M6).
