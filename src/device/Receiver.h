@@ -118,8 +118,10 @@ public:
     void setDemod(const dsp::DemodSettings& settings);
 
     // Starts recording what is being received into `folder`. False when
-    // nothing is running or a recording is still finishing.
-    bool startRecording(const std::filesystem::path& folder, const std::string& software);
+    // nothing is running or a recording is still finishing. `expectedBytes`
+    // (optional) is checked against the free disk space (IqRecorder::start).
+    bool startRecording(const std::filesystem::path& folder, const std::string& software,
+                        uint64_t expectedBytes = 0);
     void stopRecording();
     [[nodiscard]] RecorderStatus recording() const { return m_recorder.status(); }
 

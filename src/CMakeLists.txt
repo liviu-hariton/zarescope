@@ -5,7 +5,11 @@
 #
 #   zarescope_dsp       FFT, spectrum, queues    → KissFFT
 #   zarescope_adsb      Mode S / ADS-B decoder   → zarescope_dsp
-#   zarescope_sat       catalog, TLE, SGP4, passes → sgp4
+#   zarescope_sat       catalog, TLE, SGP4, passes, pass scheduler → sgp4
+#   zarescope_os        running external programs (POSIX), tool locations
+#   zarescope_integrations  SatDump runner     → zarescope_os
+#   zarescope_automation    automatic pass recording and decoding
+#                           → zarescope_device, zarescope_sat, zarescope_integrations
 #   zarescope_audio     sound output             → miniaudio
 #   zarescope_device    sample sources, IQ files → zarescope_dsp, librtlsdr
 #   zarescope_theme     design tokens            → nlohmann/json
@@ -32,6 +36,7 @@ target_link_libraries(zarescope_audio PRIVATE zs_miniaudio)
 zarescope_set_warnings(zarescope_audio)
 
 add_library(zarescope_device STATIC
+    device/DeviceArbiter.cpp
     device/DeviceIdentity.cpp
     device/FileSource.cpp
     device/IqMetadata.cpp
@@ -57,6 +62,7 @@ zarescope_set_warnings(zarescope_adsb)
 
 add_library(zarescope_sat STATIC
     sat/Orbit.cpp
+    sat/PassScheduler.cpp
     sat/SatCatalog.cpp
     sat/SatelliteService.cpp)
 target_include_directories(zarescope_sat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -64,6 +70,31 @@ target_link_libraries(zarescope_sat
     PUBLIC zarescope_device
     PRIVATE zs_sgp4 nlohmann_json::nlohmann_json CURL::libcurl)
 zarescope_set_warnings(zarescope_sat)
+
+# Plain C++ against POSIX and the OS's tool locations: no UI, so the tests
+# can link it.
+if(APPLE)
+    add_library(zarescope_os STATIC
+        platform/posix/PosixProcess.cpp
+        platform/macos/MacExternalTools.cpp)
+endif()
+target_include_directories(zarescope_os PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+zarescope_set_warnings(zarescope_os)
+
+add_library(zarescope_integrations STATIC
+    integrations/SatDumpRunner.cpp)
+target_include_directories(zarescope_integrations PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_integrations
+    PUBLIC nlohmann_json::nlohmann_json
+    PRIVATE zarescope_os zarescope_device)
+zarescope_set_warnings(zarescope_integrations)
+
+add_library(zarescope_automation STATIC
+    app/PassAutomation.cpp)
+target_include_directories(zarescope_automation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_automation
+    PUBLIC zarescope_device zarescope_sat zarescope_integrations)
+zarescope_set_warnings(zarescope_automation)
 
 add_library(zarescope_theme STATIC
     ui/theme/DesignTokens.cpp)
@@ -86,7 +117,7 @@ add_library(zarescope_ui STATIC
     ui/Typography.cpp
     ui/UiKit.cpp
     ui/WaterfallColors.cpp)
-target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zs_imgui zs_implot)
+target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zarescope_automation zs_imgui zs_implot)
 zarescope_set_warnings(zarescope_ui)
 
 if(APPLE)

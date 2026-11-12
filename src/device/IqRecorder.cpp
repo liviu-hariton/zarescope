@@ -2,6 +2,7 @@
 
 #include "device/IqRecorder.h"
 
+#include <format>
 #include <fstream>
 
 namespace zarescope::device {
@@ -13,7 +14,7 @@ IqRecorder::~IqRecorder() {
     waitUntilIdle();
 }
 
-bool IqRecorder::start(std::filesystem::path folder, IqMetadata metadata) {
+bool IqRecorder::start(std::filesystem::path folder, IqMetadata metadata, uint64_t expectedBytes) {
     {
         const std::scoped_lock lock(m_statusMutex);
         if (m_status.state != RecorderState::Idle) {
@@ -27,6 +28,8 @@ bool IqRecorder::start(std::filesystem::path folder, IqMetadata metadata) {
     // offer() finished (see run()).
     m_stopRequested.store(false);
     m_retuned.store(false);
+    m_matched = false;  // published to the DSP thread by m_recording's store below
+    m_skipped = 0;
     m_bytesWritten.store(0);
     m_dropped.store(0);
     m_centerFrequencyHz.store(metadata.centerFrequencyHz);
@@ -38,9 +41,10 @@ bool IqRecorder::start(std::filesystem::path folder, IqMetadata metadata) {
         m_status.path = folder / recordingFileName(metadata.startUtc, metadata.centerFrequencyHz);
         m_status.startUtc = metadata.startUtc;
     }
-    m_writer = std::thread([this, folder = std::move(folder), metadata = std::move(metadata)] {
-        run(folder, metadata);
-    });
+    m_writer = std::thread(
+        [this, folder = std::move(folder), metadata = std::move(metadata), expectedBytes] {
+            run(folder, metadata, expectedBytes);
+        });
     // Open the gate last, so offer() only ever sees a ready writer.
     m_recording.store(true);
     return true;
@@ -60,11 +64,15 @@ void IqRecorder::offer(const SampleBlock& block) {
     // offers in flight before its final drain.
     m_offersInFlight.fetch_add(1);
     if (m_recording.load()) {
-        if (block.centerFrequencyHz != m_centerFrequencyHz.load(std::memory_order_relaxed) ||
-            block.sampleRateSps != m_sampleRateSps.load(std::memory_order_relaxed)) {
+        const bool matches =
+            block.centerFrequencyHz == m_centerFrequencyHz.load(std::memory_order_relaxed) &&
+            block.sampleRateSps == m_sampleRateSps.load(std::memory_order_relaxed);
+        if (!matches && !m_matched && m_skipped < kMaxSkippedAtStart) {
+            ++m_skipped;  // queued before a retune that start() already knew about
+        } else if (!matches) {
             m_retuned.store(true, std::memory_order_release);
             requestStop();
-        } else if (SampleBlock* slot = m_queue.beginWrite()) {
+        } else if (m_matched = true; SampleBlock* slot = m_queue.beginWrite()) {
             slot->bytes.assign(block.bytes.begin(), block.bytes.end());  // fits the reserve
             slot->firstSampleUtc = block.firstSampleUtc;
             m_queue.commitWrite();
@@ -90,7 +98,7 @@ void IqRecorder::waitUntilIdle() {
     }
 }
 
-void IqRecorder::run(std::filesystem::path folder, IqMetadata metadata) {
+void IqRecorder::run(std::filesystem::path folder, IqMetadata metadata, uint64_t expectedBytes) {
     std::string error;
     std::filesystem::path path;
     {
@@ -118,6 +126,19 @@ void IqRecorder::run(std::filesystem::path folder, IqMetadata metadata) {
     if (ec) {
         fail("cannot create " + folder.string() + ": " + ec.message());
         return;
+    }
+    if (expectedBytes > 0) {
+        // Leave room for everything else on the disk, not just this file.
+        constexpr uint64_t kMarginBytes = 512ULL * 1024 * 1024;
+        const auto space = std::filesystem::space(folder, ec);
+        if (!ec && space.available < expectedBytes + kMarginBytes) {
+            constexpr double kMb = 1024.0 * 1024.0;
+            fail(std::format("not enough free disk space: the recording needs about {:.0f} MB, "
+                             "{:.0f} MB are free",
+                             static_cast<double>(expectedBytes + kMarginBytes) / kMb,
+                             static_cast<double>(space.available) / kMb));
+            return;
+        }
     }
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out || !writeSidecar(path, metadata, error)) {

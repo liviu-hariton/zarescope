@@ -9,6 +9,7 @@
         { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 }
       ],
       "satdumpPipeline": "meteor_m2-x_lrpt",
+      "satdumpArgs": ["--dc_block"],
       "recordSampleRateSps": 1024000
     },
     {
@@ -19,6 +20,7 @@
         { "frequencyHz": 137900000, "mode": "lrpt", "bandwidthHz": 150000 }
       ],
       "satdumpPipeline": "meteor_m2-x_lrpt",
+      "satdumpArgs": ["--dc_block"],
       "recordSampleRateSps": 1024000
     }
   ]

@@ -13,7 +13,9 @@
 //
 // A recording holds one frequency and one sample rate. If a block arrives
 // with a different one (the user retuned), the recording ends there and
-// status().endedByRetune says so.
+// status().endedByRetune says so. Blocks still queued from before a retune
+// that happened just before start() are skipped instead: the recording
+// begins with the first block at its own frequency and rate.
 
 #pragma once
 
@@ -52,7 +54,10 @@ public:
     // UI thread. Starts a recording in `folder` (created if needed) described
     // by `metadata` (frequency, rate, gain, device; startUtc names the file).
     // Returns false while a previous recording is still finishing.
-    bool start(std::filesystem::path folder, IqMetadata metadata);
+    // `expectedBytes`, when known (a satellite pass of known length), is
+    // checked against the free disk space first: the recording fails at once
+    // with a clear error rather than filling the disk halfway through.
+    bool start(std::filesystem::path folder, IqMetadata metadata, uint64_t expectedBytes = 0);
 
     // UI thread. Ends the recording; the writer flushes and finishes the
     // sidecar in the background. Returns at once.
@@ -68,7 +73,11 @@ public:
     void waitUntilIdle();
 
 private:
-    void run(std::filesystem::path folder, IqMetadata metadata);
+    void run(std::filesystem::path folder, IqMetadata metadata, uint64_t expectedBytes);
+
+    // How many mismatched blocks may be skipped before the first matching
+    // one: the whole queue's worth, i.e. everything produced before start().
+    static constexpr int kMaxSkippedAtStart = static_cast<int>(kBlockQueueSlots);
 
     BlockQueue m_queue;
     std::atomic<bool> m_recording{false};
@@ -77,6 +86,9 @@ private:
     std::atomic<uint32_t> m_sampleRateSps{0};
     std::atomic<bool> m_stopRequested{false};
     std::atomic<bool> m_retuned{false};
+    // DSP thread only (reset by start() before the gate opens).
+    bool m_matched = false;
+    int m_skipped = 0;
     std::atomic<uint64_t> m_bytesWritten{0};
     std::atomic<uint64_t> m_dropped{0};
 

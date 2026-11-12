@@ -209,7 +209,8 @@ void Receiver::setDemod(const dsp::DemodSettings& settings) {
     }
 }
 
-bool Receiver::startRecording(const std::filesystem::path& folder, const std::string& software) {
+bool Receiver::startRecording(const std::filesystem::path& folder, const std::string& software,
+                              uint64_t expectedBytes) {
     const ReceiverStatus now = status();
     if (now.state != ReceiverState::Running) {
         return false;
@@ -228,7 +229,7 @@ bool Receiver::startRecording(const std::filesystem::path& folder, const std::st
     } else {
         metadata.device = "recording " + now.file.filename().string();
     }
-    return m_recorder.start(folder, std::move(metadata));
+    return m_recorder.start(folder, std::move(metadata), expectedBytes);
 }
 
 void Receiver::stopRecording() { m_recorder.requestStop(); }

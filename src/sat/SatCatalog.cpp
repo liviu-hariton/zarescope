@@ -32,6 +32,7 @@ std::optional<std::vector<Satellite>> parseCatalog(std::string_view text, std::s
             sat.active = entry.value("active", true);
             sat.satdumpPipeline = entry.value("satdumpPipeline", "");
             sat.recordSampleRateSps = entry.value("recordSampleRateSps", 0U);
+            sat.satdumpArgs = entry.value("satdumpArgs", std::vector<std::string>{});
             for (const auto& link : entry.at("downlinks")) {
                 Downlink downlink;
                 downlink.frequencyHz = link.at("frequencyHz").get<int64_t>();

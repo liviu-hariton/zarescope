@@ -29,7 +29,11 @@ struct Satellite {
     std::string name;
     bool active = true;
     std::vector<Downlink> downlinks;
-    std::string satdumpPipeline;  // checked against `satdump --help` in M5
+    // How a pass recording is decoded (M5): the SatDump pipeline id and any
+    // extra command-line options, both checked against SatDump 1.2.2
+    // (docs/DECISIONS.md). Empty pipeline: the satellite isn't recorded.
+    std::string satdumpPipeline;
+    std::vector<std::string> satdumpArgs;
     uint32_t recordSampleRateSps = 0;
 };
 
