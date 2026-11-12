@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cfloat>
 #include <cmath>
 
 #include <algorithm>
@@ -113,6 +114,17 @@ void beginArea(const char* id, float height, ImU32 background) {
 }
 
 std::string cstr(std::string_view text) { return std::string(text); }
+
+// A popover opening at `top` may be taller than the space left below it
+// (a short window, or Larger text): cap it at the window's bottom edge, less
+// a margin, and let it scroll. Call just before BeginPopup().
+void limitPopoverHeight(float top) {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float margin = ImGui::GetStyle().WindowPadding.y;
+    const float available = viewport->WorkPos.y + viewport->WorkSize.y - top - margin;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0F, 0.0F),
+                                        ImVec2(FLT_MAX, std::max(available, margin * 6.0F)));
+}
 
 }  // namespace
 
@@ -1068,6 +1080,7 @@ void MainWindow::drawDevicePopup() {
         }
     }
     ImGui::SetNextWindowPos(m_deviceAnchor, ImGuiCond_Always, ImVec2(1.0F, 0.0F));
+    limitPopoverHeight(m_deviceAnchor.y);
     ImGui::SetNextWindowSize(ImVec2(kPopoverWidth + 2.0F * m_ui.spacing("16"), 0.0F));
     if (!ImGui::BeginPopup("##devices")) {
         return;
@@ -1234,6 +1247,7 @@ void MainWindow::drawGainPopup() {
         m_openGain = false;
     }
     ImGui::SetNextWindowPos(m_gainAnchor, ImGuiCond_Always);
+    limitPopoverHeight(m_gainAnchor.y);
     if (!ImGui::BeginPopup("##gain")) {
         return;
     }
@@ -1270,6 +1284,7 @@ void MainWindow::drawFftPopup() {
         m_openFft = false;
     }
     ImGui::SetNextWindowPos(m_fftAnchor, ImGuiCond_Always, ImVec2(1.0F, 0.0F));
+    limitPopoverHeight(m_fftAnchor.y);
     if (!ImGui::BeginPopup("##fftSettings")) {
         return;
     }
@@ -1314,6 +1329,7 @@ void MainWindow::drawAudioPopup() {
         m_openAudio = false;
     }
     ImGui::SetNextWindowPos(m_audioAnchor, ImGuiCond_Always);
+    limitPopoverHeight(m_audioAnchor.y);
     if (!ImGui::BeginPopup("##audio")) {
         return;
     }
@@ -1379,6 +1395,7 @@ void MainWindow::drawPresetsPopup() {
         m_openPresets = false;
     }
     ImGui::SetNextWindowPos(m_presetsAnchor, ImGuiCond_Always);
+    limitPopoverHeight(m_presetsAnchor.y);
     if (!ImGui::BeginPopup("##presetList")) {
         return;
     }
@@ -1405,6 +1422,7 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
         m_openSettings = false;
     }
     ImGui::SetNextWindowPos(m_settingsAnchor, ImGuiCond_Always, ImVec2(1.0F, 0.0F));
+    limitPopoverHeight(m_settingsAnchor.y);
     if (!ImGui::BeginPopup("##settings")) {
         return;
     }

@@ -16,6 +16,8 @@ ImVec2 operator+(ImVec2 a, ImVec2 b) { return {a.x + b.x, a.y + b.y}; }
 
 // DESIGN.md §5: icons in buttons, chips and banners are 16 px.
 constexpr float kIconPx = 16.0F;
+// DESIGN.md §5: the icon set's middle size, for icon-only buttons.
+constexpr float kIconOnlyPx = 20.0F;
 
 }  // namespace
 
@@ -136,16 +138,27 @@ void UiKit::icon(ImDrawList& drawList, Icon icon, ImVec2 c, float size, ImU32 co
                          ImVec2(c.x + r * 0.4F, c.y - r * 0.3F), color, stroke);
         break;
     case Icon::Settings: {
-        // A gear: a ring with eight teeth.
-        drawList.AddCircle(c, r * 0.5F, color, 0, stroke);
-        for (int i = 0; i < 8; ++i) {
-            const float a = static_cast<float>(i) * 3.14159265F / 4.0F;
-            const ImVec2 dir(std::cos(a), std::sin(a));
-            drawList.AddLine(ImVec2(c.x + dir.x * r * 0.62F, c.y + dir.y * r * 0.62F),
-                             ImVec2(c.x + dir.x * r * 0.88F, c.y + dir.y * r * 0.88F), color,
-                             stroke);
+        // A cog: six square-cut teeth around a body, and a hole in the
+        // middle (design/icons/settings.svg). Six, not eight: they stay
+        // distinct at 16–20 px on a 1x screen.
+        constexpr int kTeeth = 6;
+        constexpr float kPi = 3.14159265F;
+        const float outer = r * 0.96F;  // tooth tips
+        const float inner = r * 0.70F;  // between the teeth
+        const float tip = kPi / kTeeth * 0.40F;   // half a tooth, at the tip
+        const float base = kPi / kTeeth * 0.62F;  // half a tooth, at its root
+        auto at = [&](float radius, float angle) {
+            return ImVec2(c.x + radius * std::cos(angle), c.y + radius * std::sin(angle));
+        };
+        for (int i = 0; i < kTeeth; ++i) {
+            const float a = (static_cast<float>(i) + 0.5F) * 2.0F * kPi / kTeeth;
+            drawList.PathLineTo(at(inner, a - base));
+            drawList.PathLineTo(at(outer, a - tip));
+            drawList.PathLineTo(at(outer, a + tip));
+            drawList.PathLineTo(at(inner, a + base));
         }
-        drawList.AddCircleFilled(c, r * 0.18F, color);
+        drawList.PathStroke(color, stroke, ImDrawFlags_Closed);
+        drawList.AddCircle(c, r * 0.30F, color, 0, stroke);
         break;
     }
     case Icon::Speaker: {
@@ -258,7 +271,9 @@ bool UiKit::iconButton(const char* id, ImVec2 pos, Icon icon, std::string_view t
                                            : "bg/raised"),
                            radius("md"));
     drawList.AddRect(pos, max, color("border/strong"), radius("md"), border());
-    this->icon(drawList, icon, ImVec2(pos.x + side * 0.5F, pos.y + side * 0.5F), kIconPx,
+    // Icon-only buttons use the middle icon size (20): with no label beside
+    // it, the icon alone has to carry the meaning.
+    this->icon(drawList, icon, ImVec2(pos.x + side * 0.5F, pos.y + side * 0.5F), kIconOnlyPx,
                color(active ? "text/primary" : "text/secondary"));
     return clicked;
 }

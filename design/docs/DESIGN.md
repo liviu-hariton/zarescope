@@ -167,6 +167,7 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
 
 - Line icons on a 24 grid, 1.75 stroke, round caps and joins, drawn in `currentColor`. Use them at 16, 20 or 24 px.
 - Set: spectrum, aircraft, satellite, log, settings, record, antenna, pass, stop, alert, check-circle, heading-arrow.
+- The settings icon is a cog (six teeth, a centre hole), not sliders: it reads as "settings" at a glance (changed 2026-11-12). Icon-only buttons use the 20-px size; icons next to a label use 16.
 - For ImGui, rasterize them into the font atlas in merge mode, or into a texture atlas at 2×.
 
 ## 6. Main window (artboard 6, 1440×900)
