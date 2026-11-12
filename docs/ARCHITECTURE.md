@@ -45,7 +45,8 @@ These rules hold:
 | `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Presets`, `Receiver` | `zarescope_dsp`, `zarescope_audio`, librtlsdr (static), libusb (static), nlohmann/json |
 | `zarescope_os` | `runProcess` (POSIX), where external tools live (macOS) | — |
 | `zarescope_integrations` | `SatDumpRunner` | `zarescope_os`, `zarescope_device`, nlohmann/json |
-| `zarescope_automation` | `PassAutomation` (`src/app`) | `zarescope_device`, `zarescope_sat`, `zarescope_integrations` |
+| `zarescope_store` | `Journal`, `JournalService` | SQLite (system), nlohmann/json, `zarescope_device` (timestamps) |
+| `zarescope_appcore` | `PassAutomation`, `Settings` (`src/app`) | `zarescope_device`, `zarescope_sat`, `zarescope_integrations` |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
 | `zarescope_ui` | the screens, the ImGui and ImPlot themes, fonts, strings, formats | `zarescope_theme`, `zarescope_device`, Dear ImGui, ImPlot |
 | `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog, notifications, Finder and keep-awake | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
@@ -164,8 +165,22 @@ PassAutomation::update(now, passes)
   - **Phases.** Waiting → Preparing → Recording → Finishing → Decoding.
   - **Inputs.** The receiver's status (read each frame), the arbiter, the scheduler, the runner.
   - **Output.** `AutomationStatus` for the UI. The last outcome carries a typed `PassFailure`, worded in both languages by the UI.
-  - **Library.** It lives in `zarescope_automation` so the tests can drive it.
+  - **Library.** It lives in `zarescope_appcore` so the tests can drive it.
 - **`platform::KeepAwake`.** NSProcessInfo activities: no App Nap while waiting, no idle sleep during a pass.
+
+## Settings and the journal (M6)
+
+- **`app::Settings`.**
+  - `parseSettings` and `settingsToJson` are pure.
+  - `SettingsStore` writes the latest copy on its own thread, atomically.
+  - `App` reads the file once at start-up and hands it to `MainWindow`.
+  - `MainWindow` compares its copy with the last saved one at the end of every frame and saves when they differ.
+- **`store::Journal`.** SQLite: migrations, add (keyed rows update in place), query, CSV and JSON export. `JournalService` puts it on a worker thread, and the UI reads a snapshot of the latest query.
+- **Where events come from.** `MainWindow::updateJournal`, every frame:
+  - each new pass outcome (and its images);
+  - each recording the user finished;
+  - each aircraft once per UTC day, again when its callsign arrives.
+- **Views.** `JournalView` and `DiscoveryView` draw and return what the user asked for; `MainWindow` acts on it.
 
 ## The UI (`src/ui`)
 

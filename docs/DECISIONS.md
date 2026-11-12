@@ -307,3 +307,32 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - The idle loop still wakes four times a second, and App Nap is held off while automatic recording is on, so passes start within a fraction of a second.
 - **Rejected.** A scheduler thread of its own, which would need locking around the receiver and the arbiter for no gain.
 
+## 2026-11-12 — One events table for the journal, versioned with user_version
+
+- **Decision.** The journal is one SQLite table of events with a `kind`. Rows with a `key` are updated in place: one aircraft per UTC day. The schema version lives in `PRAGMA user_version`. Migrations are an append-only list, each applied in a transaction, and a file from a newer Zarescope is refused untouched.
+- **Why.** Every event the brief lists has a time, a title, a detail line and maybe a file; anything else fits a JSON `data` column. One table keeps filtering and export simple.
+- **Rejected.**
+  - A table per kind: more joins and migrations for the same queries.
+  - The `aircraft_days` aggregate as its own table: the keyed row does the same job.
+
+## 2026-11-12 — Settings are forgiving and written off the UI thread
+
+- **Decision.**
+  - `settings.json` is read once at start-up. A missing, invalid or out-of-range value keeps its default, with a warning on stderr; the app never refuses to start over it.
+  - Changes are saved from the frame loop when the settings differ from the last saved copy. A worker thread writes the latest copy to a temporary file and renames it over the old one.
+  - Command-line choices (`--theme`, `--station`) are remembered like any other change.
+- **Why.** A crash or power cut mid-write leaves either the old file or the new one, never half of each. The UI never waits on the disk.
+
+## 2026-11-12 — The data folder changes after a restart
+
+- **Decision.** Recordings, products, the TLE cache and the journal live in the data folder: the default (Application Support) or the one chosen in Settings. A change takes effect on the next start. `settings.json` itself always stays in Application Support.
+- **Why.** Moving an open journal, a recording in progress and the TLE cache under running threads is risky for little benefit.
+- **Rejected.** Moving the existing files automatically: the user decides what to carry over.
+
+## 2026-11-12 — Discovery is a tab, and the first run opens on it
+
+- **Decision.** Discover is the first tab. A new user lands on it (`discoverySeen` in the settings); later runs open on Spectrum.
+- **Why.**
+  - It stays reachable after the first run, which a one-off dialog wouldn't.
+  - It ticks its steps off from the app's real state (location set, receiver running), so it doubles as a checklist.
+  - Its texts live in the string table, not in `presets.json`, so they are translated with everything else.

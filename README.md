@@ -2,7 +2,12 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M5, automatic Meteor recording.**
+> **Status: M6, journal, Discovery and settings.**
+> - New here? The Discover tab walks you through it: set your location, connect a receiver, then pick FM radio, air traffic, aircraft on radar, amateurs, walkie-talkies or Meteor images, each with the antenna that helps.
+> - The Journal tab keeps every pass, image, aircraft (one row per day) and recording, with search and CSV/JSON export.
+> - Settings (location, theme, language, receiver defaults, data folder, automatic recording) are saved between runs.
+>
+> **M5, automatic Meteor recording.**
 > - Turn on "Record and decode passes automatically" in the Satellites tab. At each Meteor-M pass the app tunes the stick, records until LOS, gives the receiver back, and has [SatDump](https://www.satdump.org) turn the recording into images (in `~/Library/Application Support/Zarescope/products/`).
 > - Passes are predicted for 48 hours from CelesTrak's orbits (M4), with a countdown, a polar plot and a notification before each pass.
 > - ADS-B (M3) is decoded at 1090 MHz and shown in a table and on a radar.

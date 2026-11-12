@@ -15,6 +15,7 @@ Every third-party component, with its version, licence and reason. A new depende
 | [miniaudio](https://miniaud.io) | 0.11.26 | Public domain (Unlicense) or MIT-0 | Sound output on every platform (CoreAudio on macOS) | FetchContent, `miniaudio.c` built as `zs_miniaudio`, playback only, system frameworks linked directly |
 | [sgp4](https://github.com/dnwrnr/sgp4) | 3.0 (2026-09) | Apache-2.0 | SGP4/SDP4 orbit propagation from TLEs (Vallado 2006) | FetchContent, `libsgp4/*.cpp` built as `zs_sgp4` |
 | [libcurl](https://curl.se) | the system's (macOS SDK) | curl (MIT-style) | TLE downloads from CelesTrak | `find_package(CURL)`; on Linux and Windows a system or vcpkg package |
+| [SQLite](https://sqlite.org) | the system's (macOS SDK, 3.54 at build time) | Public domain | The journal | `find_package(SQLite3)`; on Linux and Windows a system or vcpkg package |
 | [libusb](https://libusb.info) | 1.0.30 (via [libusb-cmake](https://github.com/libusb/libusb-cmake) v1.0.30-0) | LGPL-2.1-or-later | USB access for librtlsdr | FetchContent, built static for our deployment target (Homebrew's static library targets the newest macOS only) |
 
 ## Tests only
@@ -42,4 +43,4 @@ Cocoa, Foundation, Metal, QuartzCore, UniformTypeIdentifiers and UserNotificatio
 
 ## Planned
 
-These come from the plan and are added (with their rows above) in the milestone that needs them: SQLite (the journal, M6).
+Every dependency the plan lists is now in place. Heavy frameworks (Qt, Boost, GNU Radio) are deliberately not used.

@@ -181,6 +181,34 @@ SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command 
 
 **Left for later.**
 
-- Automatic recording is off at every start, until Settings are saved (M6). The products aren't in a journal yet (M6); `pass.json` holds what the journal will need.
+- Automatic recording is off at every start, until Settings are saved (M6). The products aren't in a journal yet (M6); `pass.json` holds what the journal will need. (Both done in M6.)
 - No real Meteor recording was available, so SatDump has decoded only noise through the app. The first real pass is the remaining check.
 - A Mac that sleeps misses passes. The app doesn't schedule wake-ups, which would need administrator rights.
+
+## M6 — Journal, Discovery, settings ✅ in code (2026-11-12; the end-to-end acceptance with a live stick waits for it)
+
+- [x] `Journal` (SQLite, `src/store`):
+  - events: passes and their outcome, images (the products folder), one row per aircraft per UTC day (updated when the callsign arrives), and the user's recordings;
+  - filters by kind, text and time;
+  - CSV and JSON export;
+  - the schema is versioned with `user_version`, migrations run in transactions, and a newer file is refused without being touched.
+  - `JournalService` runs it on a worker thread.
+- [x] Journal tab: kind filter, search, Export CSV / Export JSON through the save dialog, Show in Finder.
+- [x] Discover tab:
+  - a "Start here" checklist: location, receiver, pick something; each ticks itself off;
+  - the presets by category (broadcast, aviation, amateurs and walkie-talkies, weather satellites), each with two or three sentences on what you'll hear, the antenna that helps, and one action;
+  - it opens on the first run.
+- [x] Tooltips on the top-bar controls, the tabs, the FFT button, export, Show and the auto-record switch.
+- [x] Settings saved to `settings.json`: theme, language, station, minimum elevation, automatic recording at start, keep pass recordings, default sample rate, ppm, data folder (applies after a restart). It is written atomically on its own thread; anything missing or invalid falls back to its default.
+- [x] All UI text is in the string table, in English and Romanian.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| A new user can, without external documentation, set the location, listen to FM, see aircraft and schedule a Meteor pass | 🟡 Every step is reachable from Discover: Set location opens Settings; Connect opens the receiver list; FM radio and ADS-B tune their presets; Plan passes opens Satellites with the automatic-recording switch. Checked on screen without a stick (recordings); the live run waits for the V4. |
+
+**Left for later.**
+
+- The journal has no date-range control in the UI yet (the filter supports it).
+- Tooltips cover the main controls, not every field of every popover.

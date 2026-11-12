@@ -177,4 +177,67 @@ One folder per pass in `~/Library/Application Support/Zarescope/products/`, name
 
 The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted when `images` isn't empty, and kept otherwise. The journal (M6) will index these folders.
 
+## Settings (written and read)
+
+`~/Library/Application Support/Zarescope/settings.json`, written by the app (atomically: a `.tmp` file renamed over it).
+
+```json
+{
+  "zarescopeSettings": 1,
+  "theme": "dark",
+  "language": "en",
+  "station": { "latDeg": 44.4268, "lonDeg": 26.1025, "altitudeM": 80.0 },
+  "minElevationDeg": 20.0,
+  "autoRecord": false,
+  "keepBaseband": false,
+  "defaultSampleRateSps": 2400000,
+  "ppm": 0,
+  "dataFolder": "",
+  "discoverySeen": true
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `theme` | `dark` or `light` |
+| `language` | `en` or `ro` |
+| `station` | the station, or `null` when not set; latitude ±90, longitude ±180, altitude −500…9000 m |
+| `minElevationDeg` | passes below this are not listed or recorded (0–60) |
+| `autoRecord` | the pass scheduler is on at start-up |
+| `keepBaseband` | keep pass recordings after a successful decode |
+| `defaultSampleRateSps` | the rate a stick opens with; one of the rates in `RtlSdrSource.h` |
+| `ppm` | frequency correction, −200…200 |
+| `dataFolder` | where recordings, products, the TLE cache and the journal go; empty = Application Support. Applies after a restart. |
+| `discoverySeen` | false on the first run, which opens on Discover |
+
+Unknown keys are ignored; a missing or invalid value keeps its default.
+
+## Journal (written and read)
+
+`journal.sqlite` in the data folder (SQLite 3, WAL mode). The schema version is `PRAGMA user_version`, currently 1:
+
+```sql
+CREATE TABLE events (
+    id       INTEGER PRIMARY KEY,
+    time_utc TEXT NOT NULL,              -- ISO 8601 UTC with milliseconds; sorts as text
+    kind     TEXT NOT NULL,              -- pass, images, aircraft, recording
+    title    TEXT NOT NULL,
+    detail   TEXT NOT NULL DEFAULT '',
+    path     TEXT NOT NULL DEFAULT '',   -- a file or folder, if any
+    data     TEXT NOT NULL DEFAULT '{}', -- JSON object
+    key      TEXT UNIQUE                 -- one row per key when set
+);
+CREATE INDEX events_time ON events (time_utc);
+CREATE INDEX events_kind_time ON events (kind, time_utc);
+```
+
+| Kind | Title | Detail | Path | Data | Key |
+|---|---|---|---|---|---|
+| `pass` | satellite | the outcome, in the UI's language | the SatDump log when it failed | `ok`, `images`, `failure`, `error`, `folder` | — |
+| `images` | satellite | `N PNG` | the products folder | as for the pass | — |
+| `aircraft` | callsign, or ICAO | `ICAO 4B1806` | — | `icao`, `callsign` | `aircraft:<UTC day>:<ICAO>` |
+| `recording` | file name | size | the `.cu8` | — | — |
+
+**Exports.** CSV has the columns `time_utc,kind,title,detail,path,data`, every field quoted, CRLF line ends (RFC 4180). JSON is an array of objects with the same fields, with `data` embedded as an object. Both follow the filter shown, newest first.
+
 ## Coming next
