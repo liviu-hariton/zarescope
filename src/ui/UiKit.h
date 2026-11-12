@@ -94,11 +94,21 @@ public:
     bool segmented(const char* id, ImVec2 pos, const std::string_view* labels, int count,
                    int& selected, std::string_view tooltip = {});
 
+    // A switch (DESIGN.md: 36×20 pill, 14-px knob) with its label to the
+    // right, in a row of the control height. The whole row is clickable.
+    // Returns true when the user flipped it (`on` is then updated).
+    bool toggle(const char* id, ImVec2 pos, bool& on, std::string_view label, bool enabled = true);
+    [[nodiscard]] float toggleWidth(std::string_view label) const;
+
     // A status banner across [min.x, max.x] at min.y, the banner token's
     // height: soft background, 1-px border in the status colour, an icon and
-    // the message. Returns true when its action button (if any) is clicked.
+    // the message, then (optional) a progress bar for `progress` in 0…1 and
+    // up to two buttons. Returns true when `action` is clicked; a click on
+    // `secondaryAction` sets *secondaryClicked instead.
     bool banner(const char* id, ImVec2 min, float width, Status status, Icon icon,
-                std::string_view badge, std::string_view message, std::string_view action);
+                std::string_view badge, std::string_view message, std::string_view action,
+                float progress = -1.0F, std::string_view secondaryAction = {},
+                bool* secondaryClicked = nullptr);
 
     void icon(ImDrawList& drawList, Icon icon, ImVec2 center, float size, ImU32 color) const;
 

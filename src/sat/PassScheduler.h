@@ -43,7 +43,8 @@ struct RecordingPlan {
 
 class PassScheduler {
 public:
-    // Joining a pass already in progress is worth it only with this much left.
+    // Joining a pass already in progress is worth it only with this much left
+    // (or half the pass, when the pass is shorter than twice this).
     static constexpr auto kMinRemaining = std::chrono::minutes(2);
     // Predictions move by a few seconds when a TLE is refreshed; a pass is
     // "the same pass" within this much of its AOS.

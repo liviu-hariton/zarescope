@@ -12,9 +12,13 @@
 //                    north up, east right; the track solid where flown and
 //                    dotted where predicted; the satellite while it's up
 //   TLE line         where the orbits came from and how old they are
+//   automation       (M5) above the list: the "record and decode passes
+//                    automatically" switch, what it does, and whether
+//                    SatDump is installed (with the install command if not)
 
 #pragma once
 
+#include "app/PassAutomation.h"
 #include "sat/Orbit.h"
 #include "sat/SatelliteService.h"
 #include "ui/UiKit.h"
@@ -28,14 +32,26 @@
 
 namespace zarescope::ui {
 
+// What the user asked for in the Satellites tab this frame.
+struct SatelliteViewActions {
+    std::optional<bool> autoRecord;  // the switch was flipped to this
+    bool checkSatDump = false;
+};
+
 class SatelliteView {
 public:
-    void draw(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::SatelliteSnapshot& snapshot,
-              const std::vector<sat::Satellite>& catalog);
+    // `automation` is null when the app runs without pass automation.
+    SatelliteViewActions draw(UiKit& ui, ImVec2 pos, ImVec2 size,
+                              const sat::SatelliteSnapshot& snapshot,
+                              const std::vector<sat::Satellite>& catalog,
+                              const app::AutomationStatus* automation);
 
 private:
+    // Returns the height used.
+    float drawAutomation(UiKit& ui, ImVec2 pos, float width, const app::AutomationStatus& status,
+                         SatelliteViewActions& actions);
     void drawCard(UiKit& ui, ImVec2 pos, float width, const sat::PlannedPass& next,
-                  const std::vector<sat::Satellite>& catalog);
+                  const std::vector<sat::Satellite>& catalog, bool willRecord);
     void drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::SatelliteSnapshot& snapshot);
     void drawPolar(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::SatelliteSnapshot& snapshot);
 

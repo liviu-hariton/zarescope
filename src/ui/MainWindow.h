@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "app/PassAutomation.h"
 #include "decoders/adsb/AircraftStore.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
@@ -64,6 +65,13 @@ struct MainWindowServices {
     sat::SatelliteService* satellites = nullptr;
     std::function<void(const std::string& title, const std::string& body)> notify;
     std::string initialTab;  // "spectrum", "aircraft", "satellites" or empty
+    // Automatic pass recording (M5); null without a satellite catalog.
+    app::PassAutomation* automation = nullptr;
+    // Shows a file or folder in Finder.
+    std::function<void(const std::filesystem::path&)> reveal;
+    // Tells the OS the app works unattended: `waiting` while automatic
+    // recording is on, `busy` while a pass is recorded or decoded.
+    std::function<void(bool waiting, bool busy)> keepAwake;
 };
 
 class MainWindow {
@@ -89,6 +97,12 @@ private:
     void drawSpectrumArea(ImVec2 origin, ImVec2 size);
     void drawAircraftArea(ImVec2 origin, ImVec2 size);
     void notifyUpcomingPasses();
+    void updateAutomation();
+    // The banner text for how a pass ended.
+    [[nodiscard]] std::string outcomeMessage(const app::PassOutcome& outcome) const;
+    // False while a pass holds the stick: tuning, gain, device and recording
+    // are locked until it ends.
+    [[nodiscard]] bool userMayControl() const;
     void applyStation();
     // The tab strip; returns its height.
     float drawTabs(ImVec2 origin, float width);
@@ -116,6 +130,9 @@ private:
     SatelliteView m_satelliteView;
     sat::SatelliteSnapshot m_satellites;
     std::set<std::pair<uint32_t, int64_t>> m_notified;  // passes already announced
+    app::AutomationStatus m_automation;                  // this frame's
+    uint64_t m_notifiedOutcome = 0;   // serial of the last pass outcome notified
+    uint64_t m_dismissedOutcome = 0;  // … and of the last one dismissed
     enum class Tab { Spectrum, Aircraft, Satellites };
     Tab m_tab = Tab::Spectrum;
     bool m_wasAdsbActive = false;

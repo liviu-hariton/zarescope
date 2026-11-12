@@ -47,6 +47,21 @@ namespace zarescope::app {
 
 enum class AutomationPhase { Off, Waiting, Preparing, Recording, Finishing, Decoding };
 
+// Why a pass produced no image; the UI words each one in both languages.
+enum class PassFailure {
+    None,
+    Stopped,         // the user stopped it before recording began
+    PassEnded,       // over before the receiver was ready
+    OffFrequency,    // a played recording isn't on the downlink
+    ReceiverFailed,  // no stick, or it failed (detail: why)
+    TuneTimeout,     // the receiver didn't report the frequency in time
+    RecorderFailed,  // disk full, no space… (detail: why)
+    TooShort,        // too little was recorded to decode
+    SatDumpMissing,
+    SatDumpFailed,  // couldn't run, crashed, or timed out (detail: why)
+    NoImage,        // SatDump ran but found no image: usually a weak signal
+};
+
 // How the last pass ended. `serial` grows by one per outcome, so the UI
 // can tell a new one (and notify once).
 struct PassOutcome {
@@ -57,7 +72,8 @@ struct PassOutcome {
     size_t images = 0;
     std::filesystem::path folder;  // products/<date>_<satellite>, when decoding ran
     std::filesystem::path log;
-    std::string error;
+    PassFailure failure = PassFailure::None;
+    std::string error;  // English detail, for the log and the banner's tail
 };
 
 struct AutomationStatus {
@@ -128,7 +144,7 @@ private:
     void prepare(const device::ReceiverStatus& receiver, sat::Clock::time_point now);
     void record(sat::Clock::time_point now);
     void finish(sat::Clock::time_point now);
-    void giveUp(std::string error);
+    void giveUp(PassFailure failure, std::string error);
     void restoreReceiver();
     void collectDecodeResult();
     void setOutcome(PassOutcome outcome);

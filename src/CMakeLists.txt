@@ -123,6 +123,7 @@ zarescope_set_warnings(zarescope_ui)
 if(APPLE)
     add_library(zarescope_platform STATIC
         platform/macos/MacAppPaths.mm
+        platform/macos/MacDesktop.mm
         platform/macos/MacFileDialog.mm
         platform/macos/MacNotifier.mm
         platform/macos/MacWindowAppearance.mm

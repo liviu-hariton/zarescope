@@ -8,6 +8,10 @@
 //   --open FILE.cu8      play this recording at start-up
 //   --station LAT,LON    the station's location (degrees; north and east positive)
 //   --tab NAME           open on spectrum, aircraft or satellites
+//   --simulate-pass SECONDS
+//                        a made-up Meteor pass from 20 s after start-up, recorded
+//                        and decoded automatically (pair it with --open on a
+//                        137.9 MHz recording)
 
 #include "app/App.h"
 
@@ -48,6 +52,13 @@ bool parseArguments(int argc, char** argv, zarescope::app::Options& options) {
                 return false;
             }
             options.tab = std::string(tab);
+        } else if (arg == "--simulate-pass" && i + 1 < argc) {
+            int seconds = 0;
+            if (std::sscanf(argv[++i], "%d", &seconds) != 1 || seconds < 60 || seconds > 3600) {
+                std::fprintf(stderr, "--simulate-pass takes a length in seconds (60 to 3600)\n");
+                return false;
+            }
+            options.simulatePassSeconds = seconds;
         } else if (arg == "--open" && i + 1 < argc) {
             options.recording = std::filesystem::path(argv[++i]);
         } else if (arg.starts_with("-psn_")) {

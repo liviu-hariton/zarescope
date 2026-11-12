@@ -163,8 +163,57 @@ void MainWindow::notifyUpcomingPasses() {
 }
 
 bool MainWindow::wantsContinuousFrames() const {
+    const bool passBusy = m_automation.phase != app::AutomationPhase::Off &&
+                          m_automation.phase != app::AutomationPhase::Waiting;
     return m_status.state == ReceiverState::Running || m_status.state == ReceiverState::Opening ||
-           m_recording.state != RecorderState::Idle;
+           m_recording.state != RecorderState::Idle || passBusy;
+}
+
+bool MainWindow::userMayControl() const {
+    return m_services.automation == nullptr || m_services.automation->userMayControl();
+}
+
+// Runs the pass automation for this frame (it only posts commands), and
+// announces each pass outcome once.
+void MainWindow::updateAutomation() {
+    app::PassAutomation* automation = m_services.automation;
+    if (automation == nullptr) {
+        return;
+    }
+    automation->update(sat::Clock::now(), m_satellites.passes);
+    m_automation = automation->status();
+    const bool busy = m_automation.phase != app::AutomationPhase::Off &&
+                      m_automation.phase != app::AutomationPhase::Waiting;
+    if (m_services.keepAwake) {
+        m_services.keepAwake(m_automation.enabled, busy);
+    }
+    if (m_automation.last && m_automation.last->serial > m_notifiedOutcome) {
+        m_notifiedOutcome = m_automation.last->serial;
+        if (m_services.notify) {
+            m_services.notify("Zarescope", outcomeMessage(*m_automation.last));
+        }
+    }
+}
+
+std::string MainWindow::outcomeMessage(const app::PassOutcome& outcome) const {
+    const std::string& sat = outcome.satellite;
+    switch (outcome.failure) {
+    case app::PassFailure::None: return m_ui.trf(StringId::PassImagesSaved, sat, outcome.images);
+    case app::PassFailure::Stopped: return m_ui.trf(StringId::PassFailStopped, sat);
+    case app::PassFailure::PassEnded: return m_ui.trf(StringId::PassFailEnded, sat);
+    case app::PassFailure::OffFrequency: return m_ui.trf(StringId::PassFailOffFrequency, sat);
+    case app::PassFailure::ReceiverFailed:
+        return m_ui.trf(StringId::PassFailReceiver, sat, outcome.error);
+    case app::PassFailure::TuneTimeout: return m_ui.trf(StringId::PassFailTune, sat);
+    case app::PassFailure::RecorderFailed:
+        return m_ui.trf(StringId::PassFailRecorder, sat, outcome.error);
+    case app::PassFailure::TooShort: return m_ui.trf(StringId::PassFailTooShort, sat);
+    case app::PassFailure::SatDumpMissing: return m_ui.trf(StringId::PassFailNoSatDump, sat);
+    case app::PassFailure::SatDumpFailed:
+        return m_ui.trf(StringId::PassFailSatDump, sat, outcome.error);
+    case app::PassFailure::NoImage: return m_ui.trf(StringId::PassFailNoImage, sat);
+    }
+    return sat;
 }
 
 void MainWindow::pullData() {
@@ -195,6 +244,7 @@ void MainWindow::pullData() {
         m_satellites = m_services.satellites->snapshot();
         notifyUpcomingPasses();
     }
+    updateAutomation();
 
     // A newly opened source: the VFO starts on its centre frequency.
     const bool running = m_status.state == ReceiverState::Running;
@@ -207,7 +257,12 @@ void MainWindow::pullData() {
     // The demodulator listens at the VFO's offset from the centre.
     if (running) {
         m_demod.offsetHz = static_cast<double>(m_vfoHz - m_status.source.centerFrequencyHz);
-        receiver.setDemod(m_demod);
+        // During a pass the stick is on the satellite: nothing to listen to.
+        dsp::DemodSettings demod = m_demod;
+        if (!userMayControl()) {
+            demod.mode = dsp::DemodMode::Off;
+        }
+        receiver.setDemod(demod);
     }
 }
 
@@ -317,9 +372,13 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
                    kTopBarLogoPx,
                    {m_ui.logoColor("rings"), m_ui.logoColor("pass"), m_ui.color("bg/surface")});
     float x = origin.x + pad + kTopBarLogoPx + group;
+    // A pass holds the stick: everything that tunes or records is locked
+    // (the banner says why). Settings stay open.
+    const bool locked = !userMayControl();
+    ImGui::BeginDisabled(locked);
     if (running) {
         const float freqY = origin.y + (height - m_frequency.height(m_ui)) * 0.5F;
-        if (auto tuned = m_frequency.draw(m_ui, ImVec2(x, freqY), m_vfoHz, true,
+        if (auto tuned = m_frequency.draw(m_ui, ImVec2(x, freqY), m_vfoHz, !locked,
                                           device::kMinFrequencyHz, device::kMaxFrequencyHz)) {
             tuneTo(*tuned);
         }
@@ -336,7 +395,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
         const std::string label = cstr(m_ui.tr(StringId::GainLabel)) + " " +
                                   (gain ? formatGain(*gain) : cstr(m_ui.tr(StringId::GainAuto)));
         if (m_ui.button("##gain", ImVec2(x, controlY), label, ButtonKind::Secondary,
-                        Icon::ChevronDown)) {
+                        Icon::ChevronDown, !locked)) {
             m_openGain = true;
             m_gainAnchor = ImVec2(x, origin.y + height);
         }
@@ -356,6 +415,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
             m_audioAnchor = ImVec2(x, origin.y + height);
         }
     }
+    ImGui::EndDisabled();
 
     // Right, from the edge inwards: settings, record, live chip, device chip.
     float right = origin.x + width - pad - m_ui.iconButtonWidth();
@@ -364,6 +424,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
         m_openSettings = true;
         m_settingsAnchor = ImVec2(right + m_ui.iconButtonWidth(), origin.y + height);
     }
+    ImGui::BeginDisabled(locked);
     if (running) {
         const bool recording = m_recording.state != RecorderState::Idle;
         const std::string_view label =
@@ -371,7 +432,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
         const Icon icon = recording ? Icon::Stop : Icon::Record;
         right -= gap + m_ui.buttonWidth(label, icon);
         if (m_ui.button("##record", ImVec2(right, controlY), label, ButtonKind::Secondary, icon,
-                        m_recording.state != RecorderState::Finishing)) {
+                        !locked && m_recording.state != RecorderState::Finishing)) {
             toggleRecording();
         }
         const std::string_view live =
@@ -392,6 +453,7 @@ void MainWindow::drawTopBar(ShellState& /*state*/) {
     }
     m_deviceAnchor = ImVec2(right + m_ui.chipWidth(deviceLabel, false),
                             chipY + m_ui.size("controlCompact") + gap);
+    ImGui::EndDisabled();
 
     drawList.AddRectFilled(ImVec2(origin.x, origin.y + height - m_ui.border()),
                            ImVec2(origin.x + width, origin.y + height),
@@ -415,6 +477,82 @@ void MainWindow::toggleRecording() {
 float MainWindow::drawBanner(float top) {
     const ImVec2 min(ImGui::GetWindowPos().x, top);
     const float width = ImGui::GetWindowWidth();
+
+    // Automatic pass recording outranks everything: it holds the stick.
+    if (m_services.automation != nullptr) {
+        app::PassAutomation& automation = *m_services.automation;
+        const auto& current = m_automation.current;
+        const auto now = sat::Clock::now();
+        switch (m_automation.phase) {
+        case app::AutomationPhase::Preparing:
+            if (current &&
+                m_ui.banner("##passPreparing", min, width, Status::PassImminent, Icon::Dot, {},
+                            m_ui.trf(StringId::PassPreparing, formatFrequency(current->frequencyHz),
+                                     current->pass.satellite),
+                            m_ui.tr(StringId::Cancel))) {
+                automation.stopCurrent();
+            }
+            return m_ui.size("recordBanner");
+        case app::AutomationPhase::Recording:
+            if (current) {
+                const auto& pass = current->pass.pass;
+                const auto left =
+                    std::chrono::duration_cast<std::chrono::seconds>(pass.los - now).count();
+                const float progress = static_cast<float>(
+                    std::chrono::duration<double>(now - pass.aos).count() /
+                    std::max(1.0, std::chrono::duration<double>(pass.los - pass.aos).count()));
+                if (m_ui.banner("##passRecording", min, width, Status::Recording, Icon::Record,
+                                "REC",
+                                m_ui.trf(StringId::PassRecording, current->pass.satellite,
+                                         formatDuration(std::max<int64_t>(left, 0)),
+                                         formatBytes(m_automation.bytesRecorded)),
+                                m_ui.tr(StringId::StopRecording), progress)) {
+                    automation.stopCurrent();
+                }
+            }
+            return m_ui.size("recordBanner");
+        case app::AutomationPhase::Finishing:
+            if (current) {
+                m_ui.banner("##passSaving", min, width, Status::PassImminent, Icon::Dot, {},
+                            m_ui.trf(StringId::PassSaving, current->pass.satellite), {});
+            }
+            return m_ui.size("recordBanner");
+        case app::AutomationPhase::Decoding:
+            if (current) {
+                const float percent = m_automation.satdump.progressPercent;
+                const std::string message =
+                    percent > 0.0F
+                        ? m_ui.trf(StringId::PassDecodingPercent, current->pass.satellite,
+                                   static_cast<int>(percent))
+                        : m_ui.trf(StringId::PassDecoding, current->pass.satellite);
+                m_ui.banner("##passDecoding", min, width, Status::PassImminent, Icon::Dot, {},
+                            message, {}, percent / 100.0F);
+            }
+            return m_ui.size("recordBanner");
+        case app::AutomationPhase::Off:
+        case app::AutomationPhase::Waiting: break;
+        }
+        if (const auto& last = m_automation.last; last && last->serial != m_dismissedOutcome) {
+            const bool ok = last->failure == app::PassFailure::None;
+            // Success opens the images; a failure with a log opens the log.
+            const std::filesystem::path target = ok ? last->folder : last->log;
+            const std::string_view action = target.empty() ? m_ui.tr(StringId::Dismiss)
+                                            : ok           ? m_ui.tr(StringId::ShowInFinder)
+                                                           : m_ui.tr(StringId::ShowLog);
+            bool dismiss = false;
+            const bool clicked = m_ui.banner(
+                "##passOutcome", min, width, ok ? Status::Success : Status::Warning,
+                ok ? Icon::Check : Icon::Alert, {}, outcomeMessage(*last), action, -1.0F,
+                target.empty() ? std::string_view{} : m_ui.tr(StringId::Dismiss), &dismiss);
+            if (clicked && !target.empty() && m_services.reveal) {
+                m_services.reveal(target);
+            }
+            if (clicked || dismiss) {
+                m_dismissedOutcome = last->serial;
+            }
+            return m_ui.size("recordBanner");
+        }
+    }
 
     if (m_recording.state != RecorderState::Idle) {
         const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
@@ -481,10 +619,20 @@ void MainWindow::drawBody() {
         break;
     case Tab::Satellites: {
         const float pad = m_ui.spacing("16");
-        m_satelliteView.draw(m_ui, ImVec2(areaOrigin.x + pad, areaOrigin.y),
-                             ImVec2(areaSize.x - 2.0F * pad, areaSize.y - pad), m_satellites,
-                             m_services.satellites != nullptr ? m_services.satellites->catalog()
-                                                              : std::vector<sat::Satellite>{});
+        const auto actions = m_satelliteView.draw(
+            m_ui, ImVec2(areaOrigin.x + pad, areaOrigin.y),
+            ImVec2(areaSize.x - 2.0F * pad, areaSize.y - pad), m_satellites,
+            m_services.satellites != nullptr ? m_services.satellites->catalog()
+                                             : std::vector<sat::Satellite>{},
+            m_services.automation != nullptr ? &m_automation : nullptr);
+        if (m_services.automation != nullptr) {
+            if (actions.autoRecord) {
+                m_services.automation->setEnabled(*actions.autoRecord);
+            }
+            if (actions.checkSatDump) {
+                m_services.automation->checkSatDump();
+            }
+        }
         break;
     }
     case Tab::Spectrum:
@@ -596,7 +744,7 @@ float MainWindow::drawTabs(ImVec2 origin, float width) {
 }
 
 void MainWindow::drawSpectrumArea(ImVec2 origin, ImVec2 size) {
-    if (auto tuned = m_spectrum.draw(m_ui, origin, size, vfo())) {
+    if (auto tuned = m_spectrum.draw(m_ui, origin, size, vfo()); tuned && userMayControl()) {
         tuneTo(*tuned);
     }
 }

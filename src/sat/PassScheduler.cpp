@@ -30,7 +30,11 @@ std::optional<RecordingPlan> PassScheduler::due(Clock::time_point now,
                                                 const std::vector<PlannedPass>& passes) const {
     std::optional<RecordingPlan> best;
     for (const PlannedPass& pass : passes) {
-        const bool up = pass.pass.aos <= now && now + kMinRemaining <= pass.pass.los;
+        // Joining late needs kMinRemaining left, or half the pass for a
+        // pass shorter than twice that (a simulated one).
+        const auto needed = std::min<Clock::duration>(kMinRemaining,
+                                                      (pass.pass.los - pass.pass.aos) / 2);
+        const bool up = pass.pass.aos <= now && now + needed <= pass.pass.los;
         if (!up || isDone(pass)) {
             continue;
         }

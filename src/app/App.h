@@ -29,6 +29,11 @@ struct Options {
     std::string tab;
     // The station's location (latitude, longitude in degrees).
     std::optional<std::pair<double, double>> station;
+    // Make up a pass starting 20 s after start-up and lasting this many
+    // seconds, with automatic recording on: the whole record-and-decode
+    // chain without waiting for a real pass (best with --open on a
+    // 137.9 MHz recording).
+    std::optional<int> simulatePassSeconds;
 };
 
 class App {

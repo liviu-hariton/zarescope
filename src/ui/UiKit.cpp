@@ -356,8 +356,52 @@ bool UiKit::segmented(const char* id, ImVec2 pos, const std::string_view* labels
 
 // --- Banner -----------------------------------------------------------------------
 
+float UiKit::toggleWidth(std::string_view label) const {
+    return size("toggleWidth") + spacing("8") + textSize(TypeRole::Body, label).x;
+}
+
+bool UiKit::toggle(const char* id, ImVec2 pos, bool& on, std::string_view label, bool enabled) {
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    const float rowH = size("control");
+    ImGui::SetCursorScreenPos(pos);
+    ImGui::BeginDisabled(!enabled);
+    const bool clicked = ImGui::InvisibleButton(id, ImVec2(toggleWidth(label), rowH));
+    const bool hovered = ImGui::IsItemHovered();
+    ImGui::EndDisabled();
+    if (clicked) {
+        on = !on;
+    }
+
+    const float w = size("toggleWidth");
+    const float h = size("toggleHeight");
+    const float knob = size("toggleKnob");
+    const ImVec2 min(pos.x, pos.y + (rowH - h) * 0.5F);
+    const ImVec2 max(min.x + w, min.y + h);
+    const float inset = (h - knob) * 0.5F;
+    const ImVec2 knobCenter(on ? max.x - inset - knob * 0.5F : min.x + inset + knob * 0.5F,
+                            min.y + h * 0.5F);
+    if (!enabled) {
+        drawList.AddRectFilled(min, max, color("bg/raised"), radius("pill"));
+        drawList.AddRect(min, max, color("border/subtle"), radius("pill"), border());
+        drawList.AddCircleFilled(knobCenter, knob * 0.5F, color("text/disabled"));
+    } else if (on) {
+        drawList.AddRectFilled(min, max, color(hovered ? "accent/hover" : "accent"),
+                               radius("pill"));
+        drawList.AddCircleFilled(knobCenter, knob * 0.5F, color("on-accent"));
+    } else {
+        drawList.AddRectFilled(min, max, color("bg/hover"), radius("pill"));
+        drawList.AddRect(min, max, color(hovered ? "border/strong" : "border/input"),
+                         radius("pill"), border());
+        drawList.AddCircleFilled(knobCenter, knob * 0.5F, color("text/secondary"));
+    }
+    drawTextCentered(drawList, TypeRole::Body, max.x + spacing("8"), pos.y, rowH,
+                     color(enabled ? "text/primary" : "text/disabled"), label);
+    return clicked;
+}
+
 bool UiKit::banner(const char* id, ImVec2 min, float width, Status status, Icon icon,
-                   std::string_view badge, std::string_view message, std::string_view action) {
+                   std::string_view badge, std::string_view message, std::string_view action,
+                   float progress, std::string_view secondaryAction, bool* secondaryClicked) {
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     const float height = size("recordBanner");
     const ImVec2 max(min.x + width, min.y + height);
@@ -375,17 +419,42 @@ bool UiKit::banner(const char* id, ImVec2 min, float width, Status status, Icon 
         x += drawTextCentered(drawList, TypeRole::Label, x, min.y, height, fg, badge) +
              spacing("12");
     }
+    // From the right edge: the action, the secondary action, the progress bar.
     bool clicked = false;
-    float actionWidth = 0.0F;
+    float right = max.x - pad;
+    const float buttonY = min.y + (height - size("control")) * 0.5F;
     if (!action.empty()) {
-        actionWidth = buttonWidth(action);
-        clicked =
-            button(id, ImVec2(max.x - pad - actionWidth, min.y + (height - size("control")) * 0.5F),
-                   action, ButtonKind::Secondary);
+        right -= buttonWidth(action);
+        clicked = button(id, ImVec2(right, buttonY), action, ButtonKind::Secondary);
+        right -= spacing("8");
+    }
+    if (!secondaryAction.empty()) {
+        right -= buttonWidth(secondaryAction);
+        const std::string secondaryId = std::string(id) + "#2";
+        const bool hit = button(secondaryId.c_str(), ImVec2(right, buttonY), secondaryAction,
+                                ButtonKind::Secondary);
+        if (secondaryClicked != nullptr) {
+            *secondaryClicked = hit;
+        }
+        right -= spacing("8");
+    }
+    if (progress >= 0.0F) {
+        // A short track in the status colour; as wide as four controls.
+        const float barW = size("control") * 4.0F;
+        const float barH = size("bannerProgress");
+        right -= spacing("8");
+        const ImVec2 barMin(right - barW, min.y + (height - barH) * 0.5F);
+        const ImVec2 barMax(right, barMin.y + barH);
+        drawList.AddRectFilled(barMin, barMax, color("bg/hover"), radius("pill"));
+        const float filled = std::clamp(progress, 0.0F, 1.0F) * barW;
+        if (filled > 0.0F) {
+            drawList.AddRectFilled(barMin, ImVec2(barMin.x + filled, barMax.y), fg, radius("pill"));
+        }
+        right = barMin.x - spacing("4");
     }
     // The message gets what's left; it is clipped rather than overlapping
-    // the button (DESIGN.md §7: banners may truncate).
-    const float right = max.x - pad - (actionWidth > 0.0F ? actionWidth + spacing("12") : 0.0F);
+    // the controls (DESIGN.md §7: banners may truncate).
+    right -= spacing("8");
     drawList.PushClipRect(ImVec2(x, min.y), ImVec2(right, max.y), true);
     drawTextCentered(drawList, TypeRole::Body, x, min.y, height, color("text/primary"), message);
     drawList.PopClipRect();

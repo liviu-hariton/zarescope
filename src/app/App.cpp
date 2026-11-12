@@ -4,11 +4,14 @@
 
 #include "app/App.h"
 
+#include "app/PassAutomation.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
 #include "platform/AppPaths.h"
+#include "platform/Desktop.h"
 #include "platform/FileDialog.h"
 #include "platform/Notifier.h"
+#include "platform/Process.h"
 #include "platform/Renderer.h"
 #include "platform/WindowAppearance.h"
 #include "sat/SatCatalog.h"
@@ -122,6 +125,9 @@ struct App::State {
     // refers to it, goes first.
     std::unique_ptr<device::Receiver> receiver;
     std::unique_ptr<sat::SatelliteService> satellites;
+    // Pass recording drives the receiver: it goes before the receiver does.
+    std::unique_ptr<PassAutomation> automation;
+    platform::KeepAwake keepAwake;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -134,7 +140,9 @@ struct App::State {
     State& operator=(State&&) = delete;
 
     ~State() {
-        // Stop the receive threads first: nothing else may be drawing.
+        // Stop pass automation (and SatDump), then the receive threads:
+        // nothing else may be drawing.
+        automation.reset();
         if (receiver) {
             receiver.reset();
         }
@@ -214,6 +222,40 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     services.versionText = ZARESCOPE_VERSION;
     // Satellites: the catalog, the TLE cache, CelesTrak's identifiable User-Agent.
     if (auto catalog = sat::loadCatalog(paths.resources / "sat_catalog.json", error)) {
+        // Pass recording (M5): recordings next to the user's, images in products/.
+        AutomationConfig automation;
+        automation.recordings = recordings;
+        automation.products = paths.userData / "products";
+        automation.satDumpCandidates = platform::satDumpCandidates();
+        automation.software = std::string("Zarescope ") + ZARESCOPE_VERSION;
+        s.automation = std::make_unique<PassAutomation>(*s.receiver, *catalog, automation);
+        if (options.simulatePassSeconds) {
+            // The first satellite automation can record, starting in 20 s.
+            const sat::PassScheduler scheduler(*catalog);
+            for (const sat::Satellite& satellite : *catalog) {
+                sat::PlannedPass pass;
+                pass.noradId = satellite.noradId;
+                pass.satellite = satellite.name;
+                pass.pass.aos = sat::Clock::now() + std::chrono::seconds(20);
+                pass.pass.los = pass.pass.aos + std::chrono::seconds(*options.simulatePassSeconds);
+                pass.pass.tca = pass.pass.aos + (pass.pass.los - pass.pass.aos) / 2;
+                pass.pass.maxElevationDeg = 60.0;
+                if (scheduler.planFor(pass)) {
+                    s.automation->addSimulatedPass(pass);
+                    s.automation->setEnabled(true);
+                    break;
+                }
+            }
+        }
+        services.automation = s.automation.get();
+        services.reveal = [](const std::filesystem::path& path) {
+            platform::revealInFileManager(path);
+        };
+        services.keepAwake = [&keep = s.keepAwake](bool waiting, bool busy) {
+            keep.set(busy      ? platform::KeepAwake::Level::Pass
+                     : waiting ? platform::KeepAwake::Level::Waiting
+                               : platform::KeepAwake::Level::Normal);
+        };
         s.satellites = std::make_unique<sat::SatelliteService>(
             std::move(*catalog), paths.userData / "tle_cache",
             std::string("Zarescope/") + ZARESCOPE_VERSION + " (+https://zarescope.eu)");

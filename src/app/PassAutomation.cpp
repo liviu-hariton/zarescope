@@ -146,16 +146,19 @@ void PassAutomation::begin(const sat::RecordingPlan& plan, const device::Receive
 
 void PassAutomation::prepare(const device::ReceiverStatus& receiver, sat::Clock::time_point now) {
     if (m_stopRequested || now >= m_plan->pass.pass.los) {
-        giveUp(m_stopRequested ? "stopped before recording began" : "the pass ended");
+        giveUp(m_stopRequested ? PassFailure::Stopped : PassFailure::PassEnded,
+               m_stopRequested ? "stopped before recording began" : "the pass ended");
         return;
     }
     if (!covers(receiver)) {
         if (receiver.state == device::ReceiverState::Running && !receiver.isDevice) {
-            giveUp("the recording being played isn't on the satellite's frequency");
+            giveUp(PassFailure::OffFrequency,
+                   "the recording being played isn't on the satellite's frequency");
         } else if (receiver.state == device::ReceiverState::Failed) {
-            giveUp(receiver.error.empty() ? "the receiver failed" : receiver.error);
+            giveUp(PassFailure::ReceiverFailed,
+                   receiver.error.empty() ? "the receiver failed" : receiver.error);
         } else if (now - m_phaseStart > kPrepareTimeout) {
-            giveUp("the receiver didn't tune in time");
+            giveUp(PassFailure::TuneTimeout, "the receiver didn't tune in time");
         }
         return;
     }
@@ -174,7 +177,7 @@ void PassAutomation::prepare(const device::ReceiverStatus& receiver, sat::Clock:
         m_recordingPath = m_receiver.recording().path;
         m_recordRateSps = receiver.source.sampleRateSps;  // a played file's own rate
     } else if (now - m_phaseStart > kPrepareTimeout) {
-        giveUp("the recorder didn't start");
+        giveUp(PassFailure::RecorderFailed, "the recorder didn't start");
     }
 }
 
@@ -210,12 +213,15 @@ void PassAutomation::finish(sat::Clock::time_point now) {
     const double recordedSeconds =
         static_cast<double>(m_bytes) / 2.0 / std::max(1.0, static_cast<double>(m_recordRateSps));
     if (!recording.error.empty() && m_bytes == 0) {
+        outcome.failure = PassFailure::RecorderFailed;
         outcome.error = recording.error;
     } else if (recordedSeconds < static_cast<double>(m_config.minRecording.count())) {
+        outcome.failure =
+            recording.error.empty() ? PassFailure::TooShort : PassFailure::RecorderFailed;
         outcome.error = recording.error.empty() ? "the recording is too short to decode"
                                                 : recording.error;
     }
-    if (!outcome.error.empty()) {
+    if (outcome.failure != PassFailure::None) {
         m_phase = AutomationPhase::Waiting;
         m_plan.reset();
         setOutcome(std::move(outcome));
@@ -266,6 +272,19 @@ void PassAutomation::collectDecodeResult() {
     outcome.images = decoded.images.size();
     outcome.log = decoded.log;
     outcome.error = decoded.error;
+    switch (decoded.failure) {
+        case integrations::SatDumpFailure::None: outcome.failure = PassFailure::None; break;
+        case integrations::SatDumpFailure::NotInstalled:
+            outcome.failure = PassFailure::SatDumpMissing;
+            break;
+        case integrations::SatDumpFailure::NoImage: outcome.failure = PassFailure::NoImage; break;
+        case integrations::SatDumpFailure::CouldNotRun:
+        case integrations::SatDumpFailure::TimedOut:
+        case integrations::SatDumpFailure::Cancelled:
+        case integrations::SatDumpFailure::Failed:
+            outcome.failure = PassFailure::SatDumpFailed;
+            break;
+    }
     if (m_phase == AutomationPhase::Decoding) {
         m_phase = AutomationPhase::Waiting;
         m_plan.reset();
@@ -273,12 +292,13 @@ void PassAutomation::collectDecodeResult() {
     setOutcome(std::move(outcome));
 }
 
-void PassAutomation::giveUp(std::string error) {
+void PassAutomation::giveUp(PassFailure failure, std::string error) {
     restoreReceiver();
     m_arbiter.releasePass();
     PassOutcome outcome;
     outcome.satellite = m_plan->pass.satellite;
     outcome.aos = m_plan->pass.pass.aos;
+    outcome.failure = failure;
     outcome.error = std::move(error);
     m_scheduler.markDone(m_plan->pass);
     m_plan.reset();

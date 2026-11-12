@@ -121,6 +121,7 @@ void SatDumpRunner::submit(SatDumpJob job, Done done) {
     }
     // Shutting down: still exactly one call.
     SatDumpResult result;
+    result.failure = SatDumpFailure::Cancelled;
     result.error = "cancelled";
     done(result);
 }
@@ -178,6 +179,7 @@ void SatDumpRunner::run() {
     lock.unlock();
     for (auto& [job, done] : pending) {
         SatDumpResult result;
+        result.failure = SatDumpFailure::Cancelled;
         result.error = "cancelled";
         done(result);
     }
@@ -217,6 +219,7 @@ SatDumpResult SatDumpRunner::execute(const SatDumpJob& job) {
         executable = m_status.executable;
     }
     if (!executable) {
+        result.failure = SatDumpFailure::NotInstalled;
         result.error = "SatDump isn't installed";
         return result;
     }
@@ -224,6 +227,7 @@ SatDumpResult SatDumpRunner::execute(const SatDumpJob& job) {
     std::error_code ec;
     fs::create_directories(job.productsDir, ec);
     if (ec) {
+        result.failure = SatDumpFailure::CouldNotRun;
         result.error = "cannot create " + job.productsDir.string() + ": " + ec.message();
         return result;
     }
@@ -233,6 +237,7 @@ SatDumpResult SatDumpRunner::execute(const SatDumpJob& job) {
     fs::remove_all(work, ec);
     fs::create_directories(work, ec);
     if (ec) {
+        result.failure = SatDumpFailure::CouldNotRun;
         result.error = "cannot create " + work.string() + ": " + ec.message();
         return result;
     }
@@ -284,15 +289,23 @@ SatDumpResult SatDumpRunner::execute(const SatDumpJob& job) {
     result.ok = !result.images.empty();
 
     if (!process.started) {
+        result.failure = SatDumpFailure::CouldNotRun;
         result.error = process.error;
     } else if (process.timedOut) {
+        result.failure = SatDumpFailure::TimedOut;
         result.error = "SatDump took longer than " + std::to_string(job.timeout.count()) + " s";
     } else if (process.cancelled) {
+        result.failure = SatDumpFailure::Cancelled;
         result.error = "cancelled";
     } else if (!result.ok && process.exitCode != 0) {
+        result.failure = SatDumpFailure::Failed;
         result.error = "SatDump failed (exit code " + std::to_string(process.exitCode) + ")";
     } else if (!result.ok) {
+        result.failure = SatDumpFailure::NoImage;
         result.error = "SatDump decoded no image (the signal was probably too weak)";
+    }
+    if (result.ok) {
+        result.failure = SatDumpFailure::None;  // images came out: whatever else happened
     }
 
     // pass.json: what was recorded and what came out of it.

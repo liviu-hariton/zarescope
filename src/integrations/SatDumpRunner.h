@@ -56,9 +56,12 @@ struct SatDumpJob {
     nlohmann::ordered_json passInfo;  // written into pass.json, results added
 };
 
+enum class SatDumpFailure { None, NotInstalled, CouldNotRun, TimedOut, Cancelled, Failed, NoImage };
+
 struct SatDumpResult {
     bool ok = false;  // at least one image came out
-    std::string error;
+    SatDumpFailure failure = SatDumpFailure::None;
+    std::string error;  // in English, for the log
     std::vector<std::filesystem::path> images;  // in productsDir
     std::filesystem::path productsDir;
     std::filesystem::path log;  // productsDir/satdump.log

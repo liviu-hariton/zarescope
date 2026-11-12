@@ -213,6 +213,12 @@ TEST_CASE("scheduler: a pass is due from AOS while enough of it is left") {
     REQUIRE(scheduler.next(kT0, passes));
     CHECK(scheduler.next(kT0, passes)->pass.aos == kT0 + 10min);
     CHECK_FALSE(scheduler.next(kT0 + 11min, passes));      // started already: not "next"
+
+    // A short pass (simulated) is due from its AOS through its first half.
+    const std::vector shortPass{pass(59051, "N2-4", 0min, 1min, 60)};
+    CHECK(scheduler.due(kT0, shortPass));
+    CHECK(scheduler.due(kT0 + 29s, shortPass));
+    CHECK_FALSE(scheduler.due(kT0 + 31s, shortPass));
 }
 
 TEST_CASE("scheduler: overlapping passes go to the higher one; done passes never return") {
@@ -399,7 +405,7 @@ TEST_CASE("satdump: no image keeps the recording; a missing SatDump fails once")
         runner.waitIdle();
         CHECK_FALSE(result.ok);
         CHECK(result.exitCode == 0);  // SatDump says 0 even then
-        CHECK(result.error.find("no image") != std::string::npos);
+        CHECK(result.failure == integrations::SatDumpFailure::NoImage);
         CHECK(fs::exists(baseband));  // kept for another try
     }
     {
@@ -409,16 +415,19 @@ TEST_CASE("satdump: no image keeps the recording; a missing SatDump fails once")
         CHECK_FALSE(runner.status().executable);
         std::atomic<int> calls{0};
         std::string error;
+        integrations::SatDumpFailure failure{};
         integrations::SatDumpJob job;
         job.baseband = baseband;
         job.productsDir = dir.path / "products2";
         runner.submit(job, [&](const integrations::SatDumpResult& r) {
             error = r.error;
+            failure = r.failure;
             ++calls;
         });
         runner.waitIdle();
         CHECK(calls == 1);
         CHECK(error == "SatDump isn't installed");
+        CHECK(failure == integrations::SatDumpFailure::NotInstalled);
     }
 }
 
@@ -524,6 +533,7 @@ TEST_CASE("automation: a simulated pass is recorded from a file and decoded") {
     CHECK(status.phase == app::AutomationPhase::Waiting);
     REQUIRE(status.last);
     CHECK(status.last->ok);
+    CHECK(status.last->failure == app::PassFailure::None);
     CHECK(status.last->images == 2);
     CHECK(status.last->satellite == "Meteor-M N2-4");
     const fs::path folder = config.products / sat::productFolderName(kT0 + 1min, "Meteor-M N2-4");
@@ -576,6 +586,6 @@ TEST_CASE("automation: a recording off the satellite's frequency gives the pass 
     CHECK(status.phase == app::AutomationPhase::Waiting);
     REQUIRE(status.last);
     CHECK_FALSE(status.last->ok);
-    CHECK(status.last->error.find("frequency") != std::string::npos);
+    CHECK(status.last->failure == app::PassFailure::OffFrequency);
     CHECK(automation.userMayControl());
 }

@@ -23,6 +23,8 @@ constexpr auto kCardLead = minutes(15);
 constexpr float kProgressHeight = 6.0F;
 // DESIGN.md §6: the side panel is 380 px wide.
 constexpr float kSidePanelWidth = 380.0F;
+// DESIGN.md §5: icons beside text are 16 px.
+constexpr float kIconPx = 16.0F;
 
 // "05:09" local time.
 std::string localTime(Clock::time_point when) {
@@ -62,8 +64,11 @@ std::string formatCountdown(seconds remaining) {
     return std::format("T{}{:02}:{:02}", sign, m, s);
 }
 
-void SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::SatelliteSnapshot& snapshot,
-                         const std::vector<sat::Satellite>& catalog) {
+SatelliteViewActions SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
+                                         const sat::SatelliteSnapshot& snapshot,
+                                         const std::vector<sat::Satellite>& catalog,
+                                         const app::AutomationStatus* automation) {
+    SatelliteViewActions actions;
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     const float measure = std::min(440.0F, size.x);
     auto message = [&](std::string_view text) {
@@ -73,12 +78,12 @@ void SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::Satellit
     };
     if (!snapshot.station) {
         message(ui.tr(StringId::NeedStationSatellites));
-        return;
+        return actions;
     }
     if (snapshot.tles.empty()) {
         message(snapshot.lastError.empty() ? std::string(ui.tr(StringId::WaitingForTle))
                                            : ui.trf(StringId::TleError, snapshot.lastError));
-        return;
+        return actions;
     }
 
     // Keep the selection on a pass that still exists; default to the next.
@@ -103,16 +108,117 @@ void SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const sat::Satellit
     const float left = std::min(kSidePanelWidth, size.x * 0.4F);
     float y = pos.y;
     if (upcoming != snapshot.passes.end()) {
-        drawCard(ui, ImVec2(pos.x, y), left, *upcoming, catalog);
+        // The card's pass is the one automation will take (or is taking).
+        const auto& handled = automation == nullptr ? std::optional<sat::PlannedPass>{}
+                              : automation->current ? std::optional(automation->current->pass)
+                                                    : automation->next;
+        const bool willRecord = automation != nullptr && automation->enabled && handled &&
+                                handled->noradId == upcoming->noradId &&
+                                handled->pass.aos == upcoming->pass.aos;
+        drawCard(ui, ImVec2(pos.x, y), left, *upcoming, catalog, willRecord);
         y += m_cardHeight + gap;
     }
     drawPolar(ui, ImVec2(pos.x, y), ImVec2(left, pos.y + size.y - y), snapshot);
-    drawPassList(ui, ImVec2(pos.x + left + gap, pos.y), ImVec2(size.x - left - gap, size.y),
+
+    // Right column: the automation panel over the pass list.
+    const float listX = pos.x + left + gap;
+    const float listWidth = size.x - left - gap;
+    float listTop = pos.y;
+    if (automation != nullptr) {
+        listTop += drawAutomation(ui, ImVec2(listX, listTop), listWidth, *automation, actions) + gap;
+    }
+    drawPassList(ui, ImVec2(listX, listTop), ImVec2(listWidth, pos.y + size.y - listTop),
                  snapshot);
+    return actions;
+}
+
+float SatelliteView::drawAutomation(UiKit& ui, ImVec2 pos, float width,
+                                    const app::AutomationStatus& status,
+                                    SatelliteViewActions& actions) {
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    const float pad = ui.spacing("16");
+    const float gap = ui.spacing("8");
+    const float inner = width - 2.0F * pad;
+    const bool missing = status.satdump.probed && !status.satdump.executable;
+
+    // Words first, measured, so the panel's background fits them.
+    std::string satdumpLine;
+    if (!status.satdump.probed) {
+        satdumpLine = ui.tr(StringId::SatDumpLooking);
+    } else if (status.satdump.executable) {
+        satdumpLine = status.satdump.version.empty()
+                          ? std::string(ui.tr(StringId::SatDumpReady))
+                          : ui.trf(StringId::SatDumpReadyVersion, status.satdump.version);
+    }
+    std::string help(ui.tr(StringId::AutoRecordHelp));
+    if (status.enabled) {
+        help += " ";
+        help += ui.tr(StringId::AutoRecordAwake);
+    }
+    const float rowH = ui.size("control");
+    const float helpH = ui.textSize(TypeRole::Body, help, inner).y;
+    const float iconGap = kIconPx + gap;
+    const std::string_view missingText = ui.tr(StringId::SatDumpMissing);
+    const std::string_view command = ui.tr(StringId::SatDumpInstallCommand);
+    const float missingH = missing ? ui.textSize(TypeRole::Body, missingText, inner - iconGap).y +
+                                         gap + ui.textSize(TypeRole::MonoData, command).y + gap +
+                                         rowH
+                                   : 0.0F;
+    const float height = pad + rowH + gap + helpH + (missing ? ui.spacing("12") + missingH : 0.0F) +
+                         pad;
+    const ImVec2 max(pos.x + width, pos.y + height);
+    drawList.AddRectFilled(pos, max, ui.color("bg/surface"), ui.radius("lg"));
+    drawList.AddRect(pos, max, ui.color("border/subtle"), ui.radius("lg"), ui.border());
+
+    const float x = pos.x + pad;
+    float y = pos.y + pad;
+    bool on = status.enabled;
+    if (ui.toggle("##autoRecord", ImVec2(x, y), on, ui.tr(StringId::AutoRecordLabel))) {
+        actions.autoRecord = on;
+    }
+    // SatDump's state, right-aligned on the switch's row, when there's room.
+    if (!satdumpLine.empty()) {
+        const float textW = ui.textSize(TypeRole::Caption, satdumpLine).x;
+        const float lineX = pos.x + width - pad - textW;
+        const bool fits = lineX > x + ui.toggleWidth(ui.tr(StringId::AutoRecordLabel)) + pad;
+        if (fits) {
+            const bool ready = status.satdump.executable.has_value();
+            if (ready) {
+                ui.icon(drawList, Icon::Check,
+                        ImVec2(lineX - gap - kIconPx * 0.5F, y + rowH * 0.5F), kIconPx,
+                        ui.color("success"));
+            }
+            ui.drawTextCentered(drawList, TypeRole::Caption, lineX, y, rowH,
+                                ui.color("text/secondary"), satdumpLine);
+        }
+    }
+    y += rowH + gap;
+    ui.drawText(drawList, TypeRole::Body, ImVec2(x, y), ui.color("text/secondary"), help, inner);
+    y += helpH;
+
+    if (missing) {
+        // Warning colour plus the alert icon: never colour alone.
+        y += ui.spacing("12");
+        const float textH = ui.textSize(TypeRole::Body, missingText, inner - iconGap).y;
+        ui.icon(drawList, Icon::Alert,
+                ImVec2(x + kIconPx * 0.5F, y + ui.textSize(TypeRole::Body, "N").y * 0.5F), kIconPx,
+                ui.color("warning"));
+        ui.drawText(drawList, TypeRole::Body, ImVec2(x + iconGap, y), ui.color("text/primary"),
+                    missingText, inner - iconGap);
+        y += textH + gap;
+        ui.drawText(drawList, TypeRole::MonoData, ImVec2(x + iconGap, y), ui.color("accent"),
+                    command);
+        y += ui.textSize(TypeRole::MonoData, command).y + gap;
+        if (ui.button("##checkSatDump", ImVec2(x + iconGap, y), ui.tr(StringId::CheckAgain),
+                      ButtonKind::Secondary)) {
+            actions.checkSatDump = true;
+        }
+    }
+    return height;
 }
 
 void SatelliteView::drawCard(UiKit& ui, ImVec2 pos, float width, const sat::PlannedPass& next,
-                             const std::vector<sat::Satellite>& catalog) {
+                             const std::vector<sat::Satellite>& catalog, bool willRecord) {
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     const float pad = ui.spacing("16");
     const float gap = ui.spacing("8");
@@ -134,6 +240,16 @@ void SatelliteView::drawCard(UiKit& ui, ImVec2 pos, float width, const sat::Plan
     float x = pos.x + pad;
     float y = pos.y + pad;
     ui.drawText(drawList, TypeRole::Caption, ImVec2(x, y), violet, ui.tr(StringId::NextPass));
+    if (willRecord) {
+        // Right-aligned on the caption line: a recording dot with its label.
+        const std::string_view label = ui.tr(StringId::WillRecord);
+        const float labelX = pos.x + width - pad - ui.textSize(TypeRole::Caption, label).x;
+        const float dot = ui.spacing("8");
+        drawList.AddCircleFilled(ImVec2(labelX - gap - dot * 0.5F, y + captionH * 0.5F), dot * 0.5F,
+                                 ui.color("recording"));
+        ui.drawText(drawList, TypeRole::Caption, ImVec2(labelX, y), ui.color("text/secondary"),
+                    label);
+    }
     y += captionH + gap;
     ui.drawText(drawList, TypeRole::Heading, ImVec2(x, y), ui.color("text/primary"),
                 next.satellite);
