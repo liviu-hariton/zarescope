@@ -1,6 +1,6 @@
 # Zarescope architecture
 
-This describes what exists today: version 0.11.0, with all of v1 (M0–M7). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
+This describes what exists today: version 0.12.0, with all of v1 (M0–M7). Each milestone adds its part here when it lands ([MILESTONES.md](MILESTONES.md)).
 
 ## Threads and data flow
 

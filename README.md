@@ -12,7 +12,7 @@
 
 ## Status
 
-**Version 0.11.0**: every v1 milestone (M0–M7) is built and tested on synthetic signals, recordings and a simulated satellite pass with the real SatDump. The checks with a live receiver are under way; [docs/MILESTONES.md](docs/MILESTONES.md) has the criterion-by-criterion state.
+**Version 0.12.0**: every v1 milestone (M0–M7) is built and tested on synthetic signals, recordings and a simulated satellite pass with the real SatDump. The checks with a live receiver are under way; [docs/MILESTONES.md](docs/MILESTONES.md) has the criterion-by-criterion state.
 
 ## Download
 

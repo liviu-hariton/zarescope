@@ -237,7 +237,7 @@ SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command 
 - Developer ID signing and notarization (on hold, 2026-11-12).
 - Opening `.cu8` files from Finder (a document type) isn't there yet.
 
-## After M7 — within v1 (0.9.0, 0.10.0, 0.11.0) ✅ (2026-11-12)
+## After M7 — within v1 (0.9.0, 0.10.0, 0.11.0, 0.12.0) ✅ (2026-11-12)
 
 Additions asked for after the milestones, still v1 scope.
 
@@ -251,3 +251,4 @@ Additions asked for after the milestones, still v1 scope.
 - [x] **First public release.** v0.10.0 on GitHub, with the `.dmg`, the `.zip` and their SHA-256.
 - [x] **Update check (0.11.0).** Off by default: Settings › Updates turns on a daily check of `zarescope.eu/latest.json`, and Zarescope › Check for Updates… asks at once. A newer version shows as a pill in the status bar and a line in About, linking to the download page; nothing is installed. DECISIONS.md, 2026-11-12.
 - [x] **The status bar shows in full (0.11.0).** The body area left out the 8-px gap before the status bar, so the bar's bottom 8 px fell below the window's edge.
+- [x] **Units (0.12.0).** Settings › Units shows altitudes, speeds and distances as metric (m, km/h, km, the default), aviation (ft, kt, NM) or imperial (ft, mph, mi); the radar's rings and the station's altitude follow it. Display only: stored values keep their units. DECISIONS.md, 2026-11-12.
