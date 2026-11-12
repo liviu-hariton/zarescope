@@ -22,7 +22,7 @@ using Clock = adsb::Clock;
 constexpr auto kStale = std::chrono::seconds(30);
 // The table takes this share of the width, at most this many points.
 constexpr float kTableShare = 0.45F;
-constexpr float kTableMaxWidth = 600.0F;
+constexpr float kTableMaxWidth = 680.0F;
 // Radar ranges to choose from (km): the smallest that holds every aircraft.
 constexpr std::array kRanges{25.0, 50.0, 100.0, 200.0, 300.0, 400.0};
 // Clicks within this many points of an aircraft select it.
@@ -128,6 +128,7 @@ void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x -
                                      textWidth);
             }
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(upper.c_str());
             ImGui::PopStyleColor();
             ImGui::PopFont();
@@ -141,7 +142,9 @@ void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
             unit.empty() ? 0.0F : ui.textSize(TypeRole::MonoData, unit).x + 4.0F;
         const float width = ui.textSize(TypeRole::MonoData, value).x + unitWidth;
         const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-        const ImVec2 at(right - width, ImGui::GetCursorScreenPos().y);
+        const ImVec2 at(right - width,
+                        ImGui::GetCursorScreenPos().y +
+                            UiKit::rowTextOffset(rowHeight, ui.textSize(TypeRole::MonoData, "0").y));
         ImDrawList& dl = *ImGui::GetWindowDrawList();
         dl.AddText(mono.font, mono.sizePx, at, ui.color(dim ? "text/disabled" : "text/primary"),
                    value.c_str());
@@ -165,14 +168,13 @@ void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
         const ImVec2 cell = ImGui::GetCursorScreenPos();
         if (aircraft->trackDeg) {
             arrow(*ImGui::GetWindowDrawList(),
-                  ImVec2(cell.x + 10.0F, cell.y + ImGui::GetTextLineHeight() * 0.5F), 7.0F,
+                  ImVec2(cell.x + 10.0F, cell.y + UiKit::rowTextOffset(rowHeight, 0.0F)), 7.0F,
                   *aircraft->trackDeg, ui.color(stale ? "text/disabled" : "accent"));
         }
         // Callsign; the whole row selects.
         ImGui::TableSetColumnIndex(1);
         ImGui::PushStyleColor(ImGuiCol_Text, ui.colorVec(stale ? "text/disabled" : "text/primary"));
-        if (ImGui::Selectable(nameOf(*aircraft).c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns)) {
+        if (UiKit::rowSelectable(nameOf(*aircraft).c_str(), selected, rowHeight)) {
             m_selected = aircraft->icao;
         }
         ImGui::PopStyleColor();
@@ -209,7 +211,7 @@ void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
     drawList.AddRectFilled(pos, max, ui.color("bg/surface"), ui.radius("lg"));
     drawList.AddRect(pos, max, ui.color("border/subtle"), ui.radius("lg"), ui.border());
     if (!station) {
-        const float measure = std::min(size.x - 2.0F * ui.spacing("24"), 360.0F);
+        const float measure = std::min(size.x - 2.0F * ui.spacing("24"), 420.0F);
         const std::string_view text = ui.tr(StringId::NeedStation);
         const ImVec2 textSize = ui.textSize(TypeRole::Body, text, measure);
         ui.drawText(

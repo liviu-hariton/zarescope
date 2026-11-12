@@ -48,10 +48,13 @@
 namespace zarescope::ui {
 
 // What the user can change from the shell. The app re-applies the theme
-// when `variant` changes.
+// when `variant` changes, and rescales the interface when `textSize` does.
 struct ShellState {
     theme::ThemeVariant variant = theme::ThemeVariant::Dark;
     Language language = Language::English;
+    // The Text size setting: "standard", "large" or "larger". The app draws
+    // the whole interface at app::interfaceScale(textSize).
+    std::string textSize = "standard";
 };
 
 // What the window needs from the app and the platform.
@@ -89,6 +92,17 @@ struct MainWindowServices {
     std::function<std::optional<std::filesystem::path>()> chooseFolder;
     // Where the data actually lives this run (the default or the setting).
     std::filesystem::path dataFolder;
+    // Finds this computer's location (Settings › Use my current location).
+    // `done` is called exactly once, on the UI thread.
+    struct LocateResult {
+        enum class Error { None, Denied, Disabled, Failed } error = Error::Failed;
+        double latDeg = 0.0;
+        double lonDeg = 0.0;
+        std::optional<double> altitudeM;
+        double accuracyM = 0.0;
+        std::string detail;
+    };
+    std::function<void(std::function<void(const LocateResult&)> done)> locate;
     // False for a run whose automatic recording was switched on by a test
     // flag (--simulate-pass): that switch isn't saved.
     bool saveAutoRecord = true;
@@ -180,6 +194,9 @@ private:
     double m_stationLat = 0.0;
     double m_stationLon = 0.0;
     double m_stationAlt = 0.0;
+    // "Use my current location": waiting for an answer, and what came back.
+    bool m_locating = false;
+    std::optional<MainWindowServices::LocateResult> m_located;
     float m_minElevation = 20.0F;
 
     // This frame's view of the receiver.

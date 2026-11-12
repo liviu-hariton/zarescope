@@ -12,8 +12,8 @@ namespace zarescope::ui {
 
 namespace {
 
-// Body text measure: about 65 characters of 13-px Inter.
-constexpr float kMeasurePx = 440.0F;
+// Body text measure: about 65 characters of 15-px Inter.
+constexpr float kMeasurePx = 520.0F;
 
 constexpr std::array<store::EventKind, 4> kKinds{store::EventKind::Pass, store::EventKind::Images,
                                                  store::EventKind::Aircraft,
@@ -153,6 +153,7 @@ JournalViewActions JournalView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
         std::string upper = ImGui::TableGetColumnName(column);
         std::transform(upper.begin(), upper.end(), upper.begin(),
                        [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+        UiKit::centreInRow(rowHeight);
         ImGui::TextUnformatted(upper.c_str());
         ImGui::PopStyleColor();
         ImGui::PopFont();
@@ -166,11 +167,11 @@ JournalViewActions JournalView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
             const store::JournalEvent& event = snapshot.events[static_cast<size_t>(row)];
             ImGui::TableNextRow(ImGuiTableRowFlags_None, rowHeight);
             ImGui::PushID(static_cast<int>(event.id));
-            const float textOffset = (rowHeight - ImGui::GetTextLineHeight()) * 0.5F;
+            const float textOffset = UiKit::rowTextOffset(rowHeight, ImGui::GetTextLineHeight());
 
             ImGui::TableSetColumnIndex(0);
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textOffset);
             ImGui::PushFont(mono.font, mono.sizePx);
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(formatLocalDateTime(event.timeUtc).c_str());
             ImGui::PopFont();
 
@@ -179,7 +180,8 @@ JournalViewActions JournalView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
                 // A dot in the kind's colour, then its name.
                 const ImVec2 at = ImGui::GetCursorScreenPos();
                 const float dot = ui.spacing("8");
-                drawList.AddCircleFilled(ImVec2(at.x + dot * 0.5F, at.y + rowHeight * 0.5F),
+                drawList.AddCircleFilled(ImVec2(at.x + dot * 0.5F,
+                                                at.y + textOffset + ImGui::GetTextLineHeight() * 0.5F),
                                          dot * 0.5F, ui.color(kindToken(event.kind)));
                 ImGui::SetCursorScreenPos(ImVec2(at.x + dot + gap, at.y + textOffset));
                 ImGui::TextUnformatted(std::string(ui.tr(kindLabel(event.kind))).c_str());
@@ -198,7 +200,7 @@ JournalViewActions JournalView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
             ImGui::TableSetColumnIndex(4);
             if (!event.path.empty()) {
                 const ImVec2 at = ImGui::GetCursorScreenPos();
-                if (ui.button("##show", ImVec2(at.x, at.y + (rowHeight - controlH) * 0.5F), show,
+                if (ui.button("##show", ImVec2(at.x, at.y + UiKit::rowTextOffset(rowHeight, controlH)), show,
                               ButtonKind::Secondary)) {
                     actions.reveal = std::filesystem::path(event.path);
                 }

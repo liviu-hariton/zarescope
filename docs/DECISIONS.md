@@ -347,3 +347,29 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Rejected.**
   - CPack: a few lines of shell show each step plainly and check the result.
   - A universal (x86_64) build: the target is Apple Silicon.
+
+## 2026-11-12 — A bigger type scale, and a Text size setting that scales everything
+
+- **Decision.**
+  - **Type scale.** Every role moved up one step: body 13 → 15, label 12 → 14, caption 11 → 12, heading 15 → 17, mono data 13 → 14. Controls went 32 → 36, rows 36/40 → 40/44, the side panel 380 → 420, and the minimum window 1120 → 1200 wide.
+  - **Text size.** Settings › Text size (Standard / Large / Larger) draws the whole interface at 100 / 110 / 120 %.
+  - **How it scales.** Before each frame, Dear ImGui is told the window is that much smaller and its pixels that much denser. Mouse positions are converted to match, and input trickling is off so each is converted once.
+- **Why.**
+  - The user found the text too small and hard to read.
+  - Scaling at the display level keeps every proportion: text, controls, spacing, plots and the waterfall.
+  - ImGui 1.92+ rasterizes glyphs at the framebuffer density, so text stays sharp instead of being stretched.
+  - Larger is capped at 120 % so the minimum window (1440 points) still fits a 13-inch MacBook Air's default resolution.
+- **Rejected.**
+  - Scaling only the fonts (`FontScaleMain`): controls and spacing would no longer fit their text.
+  - Multiplying every size in the code: easy to miss one, and every new view would have to remember.
+
+## 2026-11-12 — "Use my current location" through Core Location
+
+- **Decision.** Settings › Station has a button that asks macOS for one location fix.
+  - **Precision.** Core Location is Wi-Fi based, usually within tens of metres.
+  - **Result.** It fills latitude, longitude and, when the fix has it, the altitude, and applies them at once.
+  - **Plumbing.** `platform::LocationFinder` calls back exactly once: a fix, permission denied, Location Services off, a failure, or no fix within 30 s.
+  - **Permissions.** The prompt text is in the Info.plist. The packaged app carries the `com.apple.security.personal-information.location` entitlement, which the hardened runtime requires.
+- **Why.** Typing coordinates is the step new users stumble on. Core Location is precise, needs no network service of ours, and keeps the location on the Mac.
+- **Rejected.** An IP geolocation web service: it sends the user's IP to a third party and is only city-level accurate (often 10–50 km off), which matters for aircraft distances.
+

@@ -11,6 +11,7 @@
 #include "platform/AppPaths.h"
 #include "platform/Desktop.h"
 #include "platform/FileDialog.h"
+#include "platform/Location.h"
 #include "platform/Notifier.h"
 #include "platform/Process.h"
 #include "platform/Renderer.h"
@@ -29,9 +30,12 @@
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
+#include <imgui_internal.h>  // the input queue, for applyInterfaceScale()
 #include <implot.h>
 
+#include <algorithm>
 #include <array>
+#include <cfloat>
 #include <chrono>
 #include <cstdio>
 #include <optional>
@@ -47,7 +51,7 @@ namespace {
 constexpr int kInitialWidth = 1280;
 constexpr int kInitialHeight = 800;
 // Below this the top bar's controls start to overlap.
-constexpr int kMinimumWidth = 1120;
+constexpr int kMinimumWidth = 1200;
 constexpr int kMinimumHeight = 600;
 
 // The loop sleeps between frames when nothing happens, so an idle window
@@ -56,6 +60,43 @@ constexpr double kIdleWakeSeconds = 0.25;
 // After input, keep drawing at the display's rate this long, so hover
 // highlights and tooltips (which need a few frames) show without delay.
 constexpr auto kActiveFor = std::chrono::milliseconds(500);
+
+// The Text size setting (M6+): the whole interface is drawn bigger by
+// telling Dear ImGui the window is `scale` times smaller and its pixels
+// `scale` times denser. Every size, gap and plot grows together, and the
+// fonts are rasterized at the new density, so text stays sharp. Called
+// between the GLFW backend's NewFrame (which sets the real size and queues
+// mouse positions in window points) and ImGui::NewFrame (which reads them).
+void applyInterfaceScale(float scale) {
+    if (scale == 1.0F) {
+        return;
+    }
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(io.DisplaySize.x / scale, io.DisplaySize.y / scale);
+    io.DisplayFramebufferScale =
+        ImVec2(io.DisplayFramebufferScale.x * scale, io.DisplayFramebufferScale.y * scale);
+    // Mouse positions queued this frame are in window points: convert them.
+    // (Input trickling is off, so the queue holds only this frame's events.)
+    for (ImGuiInputEvent& event : ImGui::GetCurrentContext()->InputEventsQueue) {
+        if (event.Type == ImGuiInputEventType_MousePos && event.MousePos.PosX != -FLT_MAX) {
+            event.MousePos.PosX /= scale;
+            event.MousePos.PosY /= scale;
+        }
+    }
+}
+
+// The window can't shrink below what the layout needs at this scale.
+void applyWindowLimits(GLFWwindow* window, float scale) {
+    const int minWidth = static_cast<int>(static_cast<float>(kMinimumWidth) * scale);
+    const int minHeight = static_cast<int>(static_cast<float>(kMinimumHeight) * scale);
+    glfwSetWindowSizeLimits(window, minWidth, minHeight, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(window, &width, &height);
+    if (width < minWidth || height < minHeight) {
+        glfwSetWindowSize(window, std::max(width, minWidth), std::max(height, minHeight));
+    }
+}
 
 void glfwError(int code, const char* description) {
     std::fprintf(stderr, "GLFW error %d: %s\n", code, description);
@@ -134,6 +175,9 @@ struct App::State {
     // so whatever the window saved on its way out is still written.
     std::unique_ptr<SettingsStore> settingsStore;
     std::unique_ptr<store::JournalService> journal;
+    // Answers "use my current location"; goes before the window, whose
+    // callback it may still call (with "cancelled").
+    std::unique_ptr<platform::LocationFinder> locationFinder;
     std::optional<theme::DesignTokens> tokens;
     std::optional<ui::Typography> typography;
     std::optional<ui::MainWindow> mainWindow;
@@ -155,6 +199,7 @@ struct App::State {
         if (renderer) {
             renderer->shutdown();  // releases GPU textures, including the waterfall's
         }
+        locationFinder.reset();  // a pending answer reaches the window first
         // The window's views unregister their textures: needs the context.
         mainWindow.reset();
         satellites.reset();  // joins its worker (a download in flight ends within its timeout)
@@ -205,6 +250,9 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     // No imgui.ini next to the app: window layout is fixed in M0. Settings
     // will live in Application Support (M6).
     io.IniFilename = nullptr;
+    // applyInterfaceScale() converts each frame's queued mouse positions;
+    // trickling would carry some over to the next frame and convert them twice.
+    io.ConfigInputTrickleEventQueue = false;
 
     const platform::AppPaths paths = platform::appPaths();
     s.tokens = theme::DesignTokens::fromFile(paths.resources / "zarescope.tokens.json");
@@ -242,6 +290,8 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
                                                    ? theme::ThemeVariant::Light
                                                    : theme::ThemeVariant::Dark);
     s.shell.language = settings.language == "ro" ? ui::Language::Romanian : ui::Language::English;
+    s.shell.textSize = settings.textSize;
+    applyWindowLimits(s.window, interfaceScale(s.shell.textSize));
     applyThemeEverywhere(*s.tokens, s.shell.variant, s.window);
 
     s.receiver = std::make_unique<device::Receiver>();
@@ -312,6 +362,25 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
         return platform::chooseExportFile(name);
     };
     services.chooseFolder = [dataRoot] { return platform::chooseFolder(dataRoot); };
+    s.locationFinder = std::make_unique<platform::LocationFinder>();
+    services.locate = [&finder = *s.locationFinder](
+                          std::function<void(const ui::MainWindowServices::LocateResult&)> done) {
+        finder.request([done = std::move(done)](const platform::LocationResult& found) {
+            ui::MainWindowServices::LocateResult result;
+            using From = platform::LocationResult::Error;
+            using To = ui::MainWindowServices::LocateResult::Error;
+            result.error = found.error == From::None     ? To::None
+                           : found.error == From::Denied ? To::Denied
+                           : found.error == From::Disabled ? To::Disabled
+                                                           : To::Failed;
+            result.latDeg = found.latDeg;
+            result.lonDeg = found.lonDeg;
+            result.altitudeM = found.altitudeM;
+            result.accuracyM = found.accuracyM;
+            result.detail = found.detail;
+            done(result);
+        });
+    };
     if (options.station) {
         services.station = adsb::LatLon{options.station->first, options.station->second};
     }
@@ -355,6 +424,7 @@ int App::run() {
         const theme::ThemeVariant shownVariant = s.shell.variant;
         s.renderer->renderFrame(clearColor(*s.tokens, s.shell.variant), [&] {
             ImGui_ImplGlfw_NewFrame();
+            applyInterfaceScale(interfaceScale(s.shell.textSize));
             ImGui::NewFrame();
             if (userActive()) {
                 lastActive = Clock::now();

@@ -55,6 +55,11 @@ Settings parseSettings(std::string_view text, std::string& warning) {
     if (settings.language != "en" && settings.language != "ro") {
         settings.language = "en";
     }
+    read(json, "textSize", settings.textSize, warning);
+    if (settings.textSize != "standard" && settings.textSize != "large" &&
+        settings.textSize != "larger") {
+        settings.textSize = "standard";
+    }
     if (const auto it = json.find("station"); it != json.end() && it->is_object()) {
         StationSetting station;
         read(*it, "latDeg", station.latDeg, warning);
@@ -94,6 +99,7 @@ std::string settingsToJson(const Settings& settings) {
     json["zarescopeSettings"] = kFormatVersion;
     json["theme"] = settings.theme;
     json["language"] = settings.language;
+    json["textSize"] = settings.textSize;
     if (settings.station) {
         json["station"] = {{"latDeg", settings.station->latDeg},
                            {"lonDeg", settings.station->lonDeg},
@@ -109,6 +115,18 @@ std::string settingsToJson(const Settings& settings) {
     json["dataFolder"] = settings.dataFolder;
     json["discoverySeen"] = settings.discoverySeen;
     return json.dump(2) + "\n";
+}
+
+float interfaceScale(std::string_view textSize) {
+    // Large and Larger stay within what a 13-inch MacBook Air's default
+    // resolution (1470 points wide) can show at the minimum window width.
+    if (textSize == "large") {
+        return 1.1F;
+    }
+    if (textSize == "larger") {
+        return 1.2F;
+    }
+    return 1.0F;
 }
 
 Settings loadSettings(const std::filesystem::path& file, std::string& warning) {

@@ -35,10 +35,10 @@ using device::RecorderState;
 constexpr float kTopBarLogoPx = 28.0F;
 // The empty state's symbol, at the full drawing's native 64-px grid.
 constexpr float kEmptyStateLogoPx = 64.0F;
-// Body text measure: about 65 characters of 13-px Inter.
-constexpr float kMeasurePx = 440.0F;
+// Body text measure: about 65 characters of 15-px Inter.
+constexpr float kMeasurePx = 520.0F;
 // Popover content width (text wraps inside it).
-constexpr float kPopoverWidth = 360.0F;
+constexpr float kPopoverWidth = 420.0F;
 // DESIGN.md §5: icons in buttons and banners are 16 px.
 constexpr float kIconPx = 16.0F;
 // When the VFO leaves the captured span, the stick retunes so the VFO sits
@@ -387,6 +387,7 @@ void MainWindow::draw(ShellState& state) {
 void MainWindow::saveSettingsIfChanged(const ShellState& state) {
     m_settings.theme = state.variant == theme::ThemeVariant::Light ? "light" : "dark";
     m_settings.language = state.language == Language::Romanian ? "ro" : "en";
+    m_settings.textSize = state.textSize;
     m_settings.minElevationDeg = std::round(static_cast<double>(m_minElevation));
     if (m_services.automation != nullptr && m_services.saveAutoRecord) {
         m_settings.autoRecord = m_automation.enabled;
@@ -1417,6 +1418,21 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
                            state.variant == theme::ThemeVariant::Light)) {
         state.variant = theme::ThemeVariant::Light;
     }
+    // Text size: the whole interface scales, not only the letters.
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::TextSizeLabel)).c_str());
+    {
+        constexpr std::array<const char*, 3> kSizes{"standard", "large", "larger"};
+        const std::array<StringId, 3> labels{StringId::TextSizeStandard, StringId::TextSizeLarge,
+                                             StringId::TextSizeLarger};
+        for (size_t i = 0; i < kSizes.size(); ++i) {
+            if (i > 0) {
+                ImGui::SameLine();
+            }
+            if (ImGui::RadioButton(cstr(m_ui.tr(labels[i])).c_str(), state.textSize == kSizes[i])) {
+                state.textSize = kSizes[i];
+            }
+        }
+    }
     ImGui::Separator();
     // Language names are written in their own language, so each is
     // recognisable whatever the current one is.
@@ -1435,6 +1451,56 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
     m_stationAlt = std::clamp(m_stationAlt, -500.0, 9000.0);
     if (ImGui::Button(cstr(m_ui.tr(StringId::UseLocation)).c_str())) {
         applyStation();
+        m_located.reset();
+    }
+    // Or ask the operating system where this Mac is.
+    if (m_services.locate) {
+        ImGui::SameLine();
+        ImGui::BeginDisabled(m_locating);
+        if (ImGui::Button(cstr(m_ui.tr(StringId::UseMyLocation)).c_str())) {
+            m_locating = true;
+            m_located.reset();
+            m_services.locate([this](const MainWindowServices::LocateResult& result) {
+                m_locating = false;
+                m_located = result;
+                if (result.error == MainWindowServices::LocateResult::Error::None) {
+                    m_stationLat = result.latDeg;
+                    m_stationLon = result.lonDeg;
+                    if (result.altitudeM) {
+                        m_stationAlt = std::clamp(*result.altitudeM, -500.0, 9000.0);
+                    }
+                    applyStation();
+                }
+            });
+        }
+        ImGui::EndDisabled();
+        std::string status;
+        bool problem = false;
+        using LocateError = MainWindowServices::LocateResult::Error;
+        if (m_locating) {
+            status = m_ui.tr(StringId::Locating);
+        } else if (m_located) {
+            switch (m_located->error) {
+            case LocateError::None:
+                status = m_ui.trf(StringId::LocationFound,
+                                  std::format("{:.0f}", std::max(1.0, m_located->accuracyM)));
+                break;
+            case LocateError::Denied: status = m_ui.tr(StringId::LocationDenied); break;
+            case LocateError::Disabled: status = m_ui.tr(StringId::LocationDisabled); break;
+            case LocateError::Failed:
+                status = m_ui.trf(StringId::LocationFailed, m_located->detail);
+                break;
+            }
+            problem = m_located->error != LocateError::None;
+        }
+        if (!status.empty()) {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPopoverWidth);
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  m_ui.colorVec(problem ? "warning" : "text/secondary"));
+            ImGui::TextUnformatted(status.c_str());
+            ImGui::PopStyleColor();
+            ImGui::PopTextWrapPos();
+        }
     }
     ImGui::TextUnformatted(cstr(m_ui.tr(StringId::MinElevationLabel)).c_str());
     ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);

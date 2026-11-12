@@ -86,8 +86,8 @@ TEST_CASE("tokens: the design package's token file loads") {
 
     const auto* body = tokens.typeStyle("body");
     REQUIRE(body != nullptr);
-    CHECK(body->sizePx == doctest::Approx(13.0));
-    CHECK(body->lineHeightPx == doctest::Approx(18.0));
+    CHECK(body->sizePx == doctest::Approx(15.0));
+    CHECK(body->lineHeightPx == doctest::Approx(22.0));
     CHECK(body->weight == 400);
     const auto* caption = tokens.typeStyle("caption");
     REQUIRE(caption != nullptr);

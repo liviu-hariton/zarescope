@@ -137,6 +137,7 @@ if(APPLE)
         platform/macos/MacAppPaths.mm
         platform/macos/MacDesktop.mm
         platform/macos/MacFileDialog.mm
+        platform/macos/MacLocation.mm
         platform/macos/MacNotifier.mm
         platform/macos/MacWindowAppearance.mm
         platform/macos/MetalRenderer.mm)
@@ -145,7 +146,7 @@ if(APPLE)
     target_link_libraries(zarescope_platform
         PUBLIC zs_imgui_metal
         PRIVATE "-framework Cocoa" "-framework Foundation" "-framework UniformTypeIdentifiers"
-                "-framework UserNotifications")
+                "-framework UserNotifications" "-framework CoreLocation")
     zarescope_set_warnings(zarescope_platform)
 else()
     message(FATAL_ERROR "Zarescope v1 builds on macOS (Apple Silicon) only; Linux and Windows are later targets")

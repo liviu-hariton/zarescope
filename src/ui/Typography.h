@@ -32,16 +32,16 @@ namespace zarescope::ui {
 
 // The steps of design/docs/DESIGN.md §3.
 enum class TypeRole {
-    Display,          // 28/34  onboarding, empty states
-    Title,            // 20/26  dialog titles
-    Heading,          // 15/20  panel and card headings
-    Body,             // 13/18  default
-    Label,            // 12/16  buttons, field labels, tabs
-    Caption,          // 11/14  overlines, column headers (uppercase)
+    Display,          // 32/38  onboarding, empty states
+    Title,            // 22/28  dialog and page titles
+    Heading,          // 17/24  panel and card headings
+    Body,             // 15/22  default
+    Label,            // 14/18  buttons, field labels, tabs
+    Caption,          // 12/16  overlines, column headers (uppercase)
     MonoFreq,         // 40/44  frequency display
-    MonoFreqCompact,  // 28/32  frequency in the top bar
-    MonoData,         // 13/18  table numbers, coordinates, timers
-    MonoSmall,        // 11/14  axis ticks, the status bar
+    MonoFreqCompact,  // 30/34  frequency in the top bar
+    MonoData,         // 14/20  table numbers, coordinates, timers
+    MonoSmall,        // 12/16  axis ticks, the status bar
 };
 inline constexpr size_t kTypeRoleCount = 10;
 

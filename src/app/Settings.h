@@ -36,6 +36,8 @@ struct StationSetting {
 struct Settings {
     std::string theme = "dark";   // "dark" or "light"
     std::string language = "en";  // "en" or "ro"
+    // How big the whole interface is drawn: "standard", "large", "larger".
+    std::string textSize = "standard";
     std::optional<StationSetting> station;
     double minElevationDeg = 20.0;
     bool autoRecord = false;                  // start the pass scheduler with the app
@@ -51,6 +53,9 @@ struct Settings {
 // their defaults (and `warning` says what was ignored, if anything).
 Settings parseSettings(std::string_view json, std::string& warning);
 std::string settingsToJson(const Settings& settings);
+
+// The interface scale for a textSize value (1.0 for anything unknown).
+float interfaceScale(std::string_view textSize);
 
 // Loads the file (start-up, before the window opens). A missing file gives
 // the defaults.

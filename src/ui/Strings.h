@@ -249,6 +249,17 @@ enum class StringId {
     RestartNote,
     SatellitesSection,
     KeepRecordings,
+    // Text size and location (Settings)
+    TextSizeLabel,
+    TextSizeStandard,
+    TextSizeLarge,
+    TextSizeLarger,
+    UseMyLocation,
+    Locating,
+    LocationFound,
+    LocationDenied,
+    LocationDisabled,
+    LocationFailed,
     // Status bar
     StatusVersion,
     StatusUtc,

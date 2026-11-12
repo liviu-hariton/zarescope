@@ -78,16 +78,18 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
 
 | Token | Font | Size/line (px) | Use |
 |---|---|---|---|
-| display | Inter 600 | 28/34, −1% | onboarding, empty states |
-| title | Inter 600 | 20/26 | dialog titles |
-| heading | Inter 600 | 15/20 | panel and card headings |
-| body | Inter 400 | 13/18 | **default** |
-| label | Inter 500 | 12/16 | buttons, field labels, tabs |
-| caption | Inter 500 | 11/14, +6%, UPPERCASE | overlines, column headers |
+| display | Inter 600 | 32/38, −1% | onboarding, empty states |
+| title | Inter 600 | 22/28 | dialog titles |
+| heading | Inter 600 | 17/24 | panel and card headings |
+| body | Inter 400 | 15/22 | **default** |
+| label | Inter 500 | 14/18 | buttons, field labels, tabs |
+| caption | Inter 500 | 12/16, +6%, UPPERCASE | overlines, column headers |
 | mono/freq | JB Mono 500 | 40/44 | frequency display |
-| mono/freq-compact | JB Mono 500 | 28/32 | frequency in the top bar |
-| mono/data | JB Mono 400 | 13/18 | table numbers, coordinates, timers |
-| mono/small | JB Mono 400 | 11/14 | axis ticks |
+| mono/freq-compact | JB Mono 500 | 30/34 | frequency in the top bar |
+| mono/data | JB Mono 400 | 14/20 | table numbers, coordinates, timers |
+| mono/small | JB Mono 400 | 12/16 | axis ticks |
+
+**Size (revised 2026-11-12).** The first scale (body 13, caption 11) read too small on a 27-inch 1440p monitor at 1×, and on a 13-inch laptop. Every role moved up one clear step, and controls and rows grew to match. The Settings › Text size choice (Standard 100 %, Large 110 %, Larger 120 %) scales the whole interface on top of this, so text, controls and spacing keep their proportions.
 
 **Number formats:**
 
@@ -104,7 +106,7 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
 - **Spacing (4-px base):** 2, 4, 8, 12, 16, 24, 32, 48.
   - Panel padding is 16, item spacing is 8, section gaps are 24.
 - **Sizes:**
-  - Controls: 32 tall (compact: 26).
+  - Controls: 36 tall (compact: 28). Table rows: 44 (compact: 40).
   - Hit area: at least 44 for standalone controls.
   - Table rows: 40 (compact: 36).
 - **Radius:**
@@ -146,7 +148,7 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
   - Numbers are right-aligned mono, units in secondary.
   - Selected row uses accent/soft; stale rows (more than 30 s since the last update) use text/disabled.
 - **Status banner:**
-  - 44–48 px tall, soft background with a 1-px border in the status colour.
+  - 48 px tall, soft background with a 1-px border in the status colour.
   - Layout: icon or dot, the message, an optional progress bar (4 px) and an optional action.
   - Recording example: `● REC  Recording Meteor-M N2-4 — 7 min left  [progress]  [■ Stop recording]`.
 - **Buttons:**
@@ -157,7 +159,7 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
   - Labels use the label style; icons are 16 px with an 8-px gap.
 - **Toggle:** 36×20 pill with a 14-px knob. On: accent background, on-accent knob. Off: bg/hover background, border/input border, text/secondary knob.
 - **Slider:** 4-px track (bg/hover, filled part in accent) with a 14×14 grab at radius 3. The value is shown in the label row.
-- **Text field:** 32 tall, bg/raised, 1-px border/input, radius 4. Units are a mono suffix.
+- **Text field:** 36 tall, bg/raised, 1-px border/input, radius 4. Units are a mono suffix.
   - Error state: border in error colour, plus an error message underneath.
 - **Tabs:** label style with a 16-px icon. The active tab gets text/primary and the 2-px accent underline; inactive tabs use text/secondary.
 
@@ -180,7 +182,7 @@ From top to bottom:
    - the waterfall, filling the remaining height, with time labels on the left
    - the frequency axis
 
-   On the right, a 380-px side panel holds Passes (live polar plot plus the list) and Aircraft (table).
+   On the right, a 420-px side panel holds Passes (live polar plot plus the list) and Aircraft (table).
 5. **Status bar (28):** mono/small text — device states, coordinates, drops/CPU, UTC and local time.
 
 ## 7. Localisation (EN / RO)

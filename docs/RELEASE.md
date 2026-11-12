@@ -14,11 +14,12 @@ The output lands in `build-release/dist/Zarescope-<version>-arm64.zip` and `.dmg
 1. **Build.** Configures and builds a Release build in `build-release/` (it never touches `build/`).
 2. **Test.** Runs the tests, unless `--skip-tests`.
 3. **Strip.** Strips local symbols (`strip -x`), so no debugging paths from the build machine stay in the executable.
-4. **Sign.** Signs the whole bundle ad hoc with the hardened runtime: `codesign --sign - --options runtime`. The resources (design tokens, fonts, catalog, presets) are sealed: editing any of them breaks the signature. `codesign --verify --strict --deep` must pass.
+4. **Sign.** Signs the whole bundle ad hoc with the hardened runtime: `codesign --sign - --options runtime --entitlements cmake/Zarescope.entitlements`. The one entitlement, `com.apple.security.personal-information.location`, lets Settings › Use my current location work under the hardened runtime. The resources (design tokens, fonts, catalog, presets) are sealed: editing any of them breaks the signature. `codesign --verify --strict --deep` must pass.
 5. **Check.** It stops if any of these fails:
    - the executable links only to `/usr/lib` and `/System`;
    - it contains no path from this machine;
    - it is arm64;
+   - it has the location entitlement (see below);
    - every resource read at start-up is in the bundle.
 6. **Pack.**
    - The `.zip` is made with `ditto`, which keeps the signature.
@@ -36,7 +37,8 @@ Every third-party library (GLFW, Dear ImGui, ImPlot, KissFFT, librtlsdr, libusb,
    - **macOS 14.** Right-click the app, choose Open, then Open again.
    - **Or, in Terminal**, for an app you built yourself: `xattr -dr com.apple.quarantine /Applications/Zarescope.app`.
 3. **For satellite images**, install SatDump: `brew install --cask satdump`. Everything else works without it.
-4. **The first notification** (five minutes before a pass) asks for permission. If it's refused, the countdown in the app still works.
+4. **Use my current location** (Settings) makes macOS ask for permission once. If the answer is no, or Location Services are off, the app says where to change it; typing the coordinates still works.
+5. **The first notification** (five minutes before a pass) asks for permission. If it's refused, the countdown in the app still works.
 
 ## What the app writes
 

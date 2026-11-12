@@ -367,40 +367,40 @@
       "display": {
         "font": "ui",
         "weight": 600,
-        "size": 28,
-        "lineHeight": 34,
+        "size": 32,
+        "lineHeight": 38,
         "tracking": -0.01
       },
       "title": {
         "font": "ui",
         "weight": 600,
-        "size": 20,
-        "lineHeight": 26
+        "size": 22,
+        "lineHeight": 28
       },
       "heading": {
         "font": "ui",
         "weight": 600,
-        "size": 15,
-        "lineHeight": 20
+        "size": 17,
+        "lineHeight": 24
       },
       "body": {
         "font": "ui",
         "weight": 400,
-        "size": 13,
-        "lineHeight": 18,
+        "size": 15,
+        "lineHeight": 22,
         "default": true
       },
       "label": {
         "font": "ui",
         "weight": 500,
-        "size": 12,
-        "lineHeight": 16
+        "size": 14,
+        "lineHeight": 18
       },
       "caption": {
         "font": "ui",
         "weight": 500,
-        "size": 11,
-        "lineHeight": 14,
+        "size": 12,
+        "lineHeight": 16,
         "tracking": 0.06,
         "uppercase": true
       },
@@ -413,20 +413,20 @@
       "mono/freq-compact": {
         "font": "mono",
         "weight": 500,
-        "size": 28,
-        "lineHeight": 32
+        "size": 30,
+        "lineHeight": 34
       },
       "mono/data": {
         "font": "mono",
         "weight": 400,
-        "size": 13,
-        "lineHeight": 18
+        "size": 14,
+        "lineHeight": 20
       },
       "mono/small": {
         "font": "mono",
         "weight": 400,
-        "size": 11,
-        "lineHeight": 14
+        "size": 12,
+        "lineHeight": 16
       }
     }
   },
@@ -461,20 +461,20 @@
     }
   },
   "size": {
-    "control": 32,
-    "controlCompact": 26,
+    "control": 36,
+    "controlCompact": 28,
     "hitTarget": 44,
-    "tableRow": 40,
-    "tableRowCompact": 36,
+    "tableRow": 44,
+    "tableRowCompact": 40,
     "titleBar": 28,
     "topBar": 64,
-    "recordBanner": 44,
+    "recordBanner": 48,
     "bannerProgress": 4,
     "statusBar": 28,
     "toggleWidth": 36,
     "toggleHeight": 20,
     "toggleKnob": 14,
-    "sidePanel": 380,
+    "sidePanel": 420,
     "meterSegmentsTopBar": 24,
     "meterSegmentsFull": 30,
     "icon": [
@@ -491,7 +491,7 @@
       ],
       "FramePadding": [
         10,
-        6
+        8
       ],
       "ItemSpacing": [
         8,
@@ -502,8 +502,8 @@
         6
       ],
       "CellPadding": [
-        6,
-        4
+        8,
+        6
       ],
       "WindowRounding": 0,
       "ChildRounding": 10,
@@ -518,7 +518,7 @@
       "PopupBorderSize": 1,
       "TabBorderSize": 0,
       "GrabMinSize": 14,
-      "ScrollbarSize": 10
+      "ScrollbarSize": 12
     },
     "colors": {
       "Text": "text/primary",

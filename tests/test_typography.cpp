@@ -86,10 +86,10 @@ TEST_CASE("typography: every role maps to a shipped font and the token size") {
     const Typography typography(fonts, tokens);
 
     CHECK(typography.face(TypeRole::Body).font == fonts.uiRegular);
-    CHECK(typography.face(TypeRole::Body).sizePx == doctest::Approx(13.0));
+    CHECK(typography.face(TypeRole::Body).sizePx == doctest::Approx(15.0));
     CHECK(typography.face(TypeRole::Label).font == fonts.uiMedium);
     CHECK(typography.face(TypeRole::Display).font == fonts.uiSemiBold);
-    CHECK(typography.face(TypeRole::Display).sizePx == doctest::Approx(28.0));
+    CHECK(typography.face(TypeRole::Display).sizePx == doctest::Approx(32.0));
     CHECK(typography.face(TypeRole::Caption).uppercase);
     CHECK(typography.face(TypeRole::MonoFreq).font == fonts.monoMedium);
     CHECK(typography.face(TypeRole::MonoFreq).sizePx == doctest::Approx(40.0));

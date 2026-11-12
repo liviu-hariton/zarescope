@@ -68,11 +68,11 @@ TEST_CASE("theme: values land where the design says") {
                toImVec4(*tokens.color(ThemeVariant::Dark, "text/primary"))));
 
     CHECK(dark.FramePadding.x == doctest::Approx(10.0));
-    CHECK(dark.FramePadding.y == doctest::Approx(6.0));
+    CHECK(dark.FramePadding.y == doctest::Approx(8.0));
     CHECK(dark.FrameRounding == doctest::Approx(6.0));
     CHECK(dark.ChildRounding == doctest::Approx(10.0));
     CHECK(dark.TabBarOverlineSize == doctest::Approx(2.0));
-    CHECK(dark.FontSizeBase == doctest::Approx(13.0));
+    CHECK(dark.FontSizeBase == doctest::Approx(15.0));
 
     // Switching themes replaces every colour.
     ImGuiStyle light = dark;

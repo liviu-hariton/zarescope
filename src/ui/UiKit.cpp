@@ -461,6 +461,25 @@ bool UiKit::banner(const char* id, ImVec2 min, float width, Status status, Icon 
     return clicked;
 }
 
+float UiKit::rowTextOffset(float rowHeight, float lineHeight) {
+    const float inner = rowHeight - 2.0F * ImGui::GetStyle().CellPadding.y;
+    return std::max(0.0F, (inner - lineHeight) * 0.5F);
+}
+
+void UiKit::centreInRow(float rowHeight) {
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() +
+                         rowTextOffset(rowHeight, ImGui::GetTextLineHeight()));
+}
+
+bool UiKit::rowSelectable(const char* label, bool selected, float rowHeight) {
+    const float inner = rowHeight - 2.0F * ImGui::GetStyle().CellPadding.y;
+    ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0F, 0.5F));
+    const bool clicked = ImGui::Selectable(label, selected, ImGuiSelectableFlags_SpanAllColumns,
+                                           ImVec2(0.0F, inner));
+    ImGui::PopStyleVar();
+    return clicked;
+}
+
 void UiKit::tooltip(std::string_view text) {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("%.*s", static_cast<int>(text.size()), text.data());

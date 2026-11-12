@@ -112,6 +112,16 @@ public:
 
     void icon(ImDrawList& drawList, Icon icon, ImVec2 center, float size, ImU32 color) const;
 
+    // Table rows (DESIGN.md: tableRow / tableRowCompact tall). Text in a cell
+    // starts at the top of the row; these centre it vertically instead.
+    // centreInRow() moves the cursor down for one line of the current font.
+    static void centreInRow(float rowHeight);
+    // A selectable spanning the row's full height and every column, its
+    // label centred vertically. Returns true when clicked.
+    static bool rowSelectable(const char* label, bool selected, float rowHeight);
+    // The y offset that centres a line `lineHeight` tall in such a row.
+    static float rowTextOffset(float rowHeight, float lineHeight);
+
     // A tooltip for the last widget drawn, after the usual hover delay; it
     // also shows over disabled widgets, to say what they would do.
     static void tooltip(std::string_view text);

@@ -21,8 +21,8 @@ using namespace std::chrono;
 constexpr auto kCardLead = minutes(15);
 // DESIGN.md §5: the next-pass progress bar is 6 px tall.
 constexpr float kProgressHeight = 6.0F;
-// DESIGN.md §6: the side panel is 380 px wide.
-constexpr float kSidePanelWidth = 380.0F;
+// Body text measure: about 65 characters of 15-px Inter.
+constexpr float kMeasurePx = 520.0F;
 // DESIGN.md §5: icons beside text are 16 px.
 constexpr float kIconPx = 16.0F;
 
@@ -70,7 +70,7 @@ SatelliteViewActions SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
                                          const app::AutomationStatus* automation) {
     SatelliteViewActions actions;
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
-    const float measure = std::min(440.0F, size.x);
+    const float measure = std::min(kMeasurePx, size.x);
     auto message = [&](std::string_view text) {
         ui.drawText(drawList, TypeRole::Body,
                     ImVec2(pos.x + (size.x - measure) * 0.5F, pos.y + size.y * 0.35F),
@@ -105,7 +105,8 @@ SatelliteViewActions SatelliteView::draw(UiKit& ui, ImVec2 pos, ImVec2 size,
 
     // Left column: the next-pass card over the polar plot. Right: the list.
     const float gap = ui.spacing("16");
-    const float left = std::min(kSidePanelWidth, size.x * 0.4F);
+    // DESIGN.md §6: the side panel (a size token).
+    const float left = std::min(ui.size("sidePanel"), size.x * 0.4F);
     float y = pos.y;
     if (upcoming != snapshot.passes.end()) {
         // The card's pass is the one automation will take (or is taking).
@@ -231,8 +232,8 @@ void SatelliteView::drawCard(UiKit& ui, ImVec2 pos, float width, const sat::Plan
     const float headingH = ui.textSize(TypeRole::Heading, "N").y;
     const float dataH = ui.textSize(TypeRole::MonoData, "0").y;
     const float countdownH = ui.textSize(TypeRole::MonoFreqCompact, "0").y;
-    const float tileH = ui.textSize(TypeRole::Caption, "N").y + 4.0F + dataH;
-    m_cardHeight = pad + captionH + gap + headingH + 4.0F + dataH + gap + countdownH + gap +
+    const float tileH = ui.textSize(TypeRole::Caption, "N").y + ui.spacing("4") + dataH;
+    m_cardHeight = pad + captionH + gap + headingH + ui.spacing("4") + dataH + gap + countdownH + gap +
                    kProgressHeight + ui.spacing("12") + tileH + pad;
     const ImVec2 max(pos.x + width, pos.y + m_cardHeight);
     drawList.AddRectFilled(pos, max, ui.color("bg/surface"), ui.radius("lg"));
@@ -254,7 +255,7 @@ void SatelliteView::drawCard(UiKit& ui, ImVec2 pos, float width, const sat::Plan
     y += captionH + gap;
     ui.drawText(drawList, TypeRole::Heading, ImVec2(x, y), ui.color("text/primary"),
                 next.satellite);
-    y += headingH + 4.0F;
+    y += headingH + ui.spacing("4");
     if (const sat::Satellite* satellite = findSatellite(catalog, next.noradId);
         satellite != nullptr && !satellite->downlinks.empty()) {
         const auto& link = satellite->downlinks.front();
@@ -300,7 +301,7 @@ void SatelliteView::drawCard(UiKit& ui, ImVec2 pos, float width, const sat::Plan
         const float tx = x + tileWidth * static_cast<float>(i);
         ui.drawText(drawList, TypeRole::Caption, ImVec2(tx, y), ui.color("text/secondary"),
                     tiles[i].first);
-        ui.drawText(drawList, TypeRole::MonoData, ImVec2(tx, y + captionH + 4.0F),
+        ui.drawText(drawList, TypeRole::MonoData, ImVec2(tx, y + captionH + ui.spacing("4")),
                     ui.color("text/primary"), tiles[i].second);
     }
 }
@@ -318,7 +319,7 @@ void SatelliteView::drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size,
         ui.drawText(*ImGui::GetWindowDrawList(), TypeRole::Body,
                     ImVec2(pos.x, pos.y + ui.spacing("16")), ui.color("text/secondary"),
                     ui.trf(StringId::NoPasses, std::format("{:.0f}", snapshot.minElevationDeg)),
-                    std::min(size.x, 440.0F));
+                    std::min(size.x, kMeasurePx));
     } else if (ImGui::BeginTable("##passes", 5, kFlags, ImVec2(size.x, size.y - statusHeight))) {
         const float rowHeight = ui.size("tableRowCompact");
         ImGui::TableSetupScrollFreeze(0, 1);
@@ -341,6 +342,7 @@ void SatelliteView::drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size,
             std::string upper = ImGui::TableGetColumnName(column);
             std::transform(upper.begin(), upper.end(), upper.begin(),
                            [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(upper.c_str());
             ImGui::PopStyleColor();
             ImGui::PopFont();
@@ -361,8 +363,7 @@ void SatelliteView::drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size,
             ImGui::TableSetColumnIndex(0);
             ImGui::PushStyleColor(ImGuiCol_Text,
                                   ui.colorVec(past ? "text/disabled" : "text/primary"));
-            if (ImGui::Selectable(planned.satellite.c_str(), selected,
-                                  ImGuiSelectableFlags_SpanAllColumns)) {
+            if (UiKit::rowSelectable(planned.satellite.c_str(), selected, rowHeight)) {
                 m_selected = std::make_pair(planned.noradId, pass.aos);
             }
             ImGui::PopStyleColor();
@@ -370,6 +371,7 @@ void SatelliteView::drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size,
             ImGui::PushStyleColor(ImGuiCol_Text,
                                   ui.colorVec(past ? "text/disabled" : "text/primary"));
             ImGui::TableSetColumnIndex(1);
+            UiKit::centreInRow(rowHeight);
             // Local time, with the day when it isn't today.
             const auto aosDay = floor<days>(pass.aos);
             const auto today = floor<days>(now);
@@ -379,13 +381,16 @@ void SatelliteView::drawPassList(UiKit& ui, ImVec2 pos, ImVec2 size,
             }
             ImGui::TextUnformatted(start.c_str());
             ImGui::TableSetColumnIndex(2);
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(std::format("{:.0f}°", pass.maxElevationDeg).c_str());
             ImGui::TableSetColumnIndex(3);
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(
                 formatDuration(duration_cast<seconds>(pass.los - pass.aos).count()).c_str());
             ImGui::PopStyleColor();
             ImGui::PopFont();
             ImGui::TableSetColumnIndex(4);
+            UiKit::centreInRow(rowHeight);
             ImGui::TextUnformatted(
                 std::string(ui.tr(pass.northbound ? StringId::Northbound : StringId::Southbound))
                     .c_str());

@@ -3,10 +3,11 @@
      Info.plist template for Zarescope.app. CMake fills in the ${...} values
      from the target properties set in src/app/CMakeLists.txt.
 
-     No permission strings are needed: macOS has no Info.plist usage key for
-     notifications (UNUserNotificationCenter asks the user with the app's
-     name), the app records no audio and is not sandboxed, and USB access
-     needs no entitlement outside the sandbox. docs/RELEASE.md. -->
+     Permission strings: only location (Settings › Use my current location).
+     macOS has no Info.plist usage key for notifications
+     (UNUserNotificationCenter asks with the app's name), the app records no
+     audio and is not sandboxed, and USB access needs no entitlement outside
+     the sandbox. docs/RELEASE.md. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -47,6 +48,10 @@
     <string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Zarescope uses your location once, when you ask, to set your station: which satellites pass over you and how far away aircraft are. It is kept only in Zarescope's settings.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Zarescope uses your location once, when you ask, to set your station: which satellites pass over you and how far away aircraft are. It is kept only in Zarescope's settings.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSSupportsAutomaticGraphicsSwitching</key>

@@ -58,6 +58,7 @@ TEST_CASE("settings: round trip through JSON") {
     app::Settings settings;
     settings.theme = "light";
     settings.language = "ro";
+    settings.textSize = "larger";
     settings.station = app::StationSetting{44.4268, 26.1025, 80.0};
     settings.minElevationDeg = 25.0;
     settings.autoRecord = true;
@@ -82,6 +83,7 @@ TEST_CASE("settings: bad or missing values fall back to defaults, never fail") {
         "minElevationDeg": 95, "defaultSampleRateSps": 1234, "ppm": 9999,
         "autoRecord": "yes", "somethingNew": true})", warning);
     CHECK(s.theme == "dark");
+    CHECK(s.textSize == "standard");
     CHECK(s.language == "en");
     CHECK_FALSE(s.station);              // latitude out of range
     CHECK(s.minElevationDeg == 60.0);    // clamped
@@ -89,6 +91,15 @@ TEST_CASE("settings: bad or missing values fall back to defaults, never fail") {
     CHECK(s.ppm == 200);
     CHECK_FALSE(s.autoRecord);           // wrong type: ignored
     CHECK(warning.find("autoRecord") != std::string::npos);
+}
+
+TEST_CASE("settings: text sizes scale the interface, within a laptop's width") {
+    CHECK(app::interfaceScale("standard") == 1.0F);
+    CHECK(app::interfaceScale("large") > 1.0F);
+    CHECK(app::interfaceScale("larger") > app::interfaceScale("large"));
+    CHECK(app::interfaceScale("huge") == 1.0F);
+    // A 13-inch MacBook Air shows 1470 points across by default.
+    CHECK(1200.0F * app::interfaceScale("larger") <= 1470.0F);
 }
 
 TEST_CASE("settings: the store writes the latest copy, atomically") {

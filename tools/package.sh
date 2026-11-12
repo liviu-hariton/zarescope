@@ -53,7 +53,8 @@ strip -x "$exe"
 step "Signing ad hoc, with the hardened runtime"
 # The bundle is signed as a whole, so its resources (tokens, fonts,
 # catalog) are sealed too: a changed file makes the signature fail.
-codesign --force --sign - --options runtime --timestamp=none "$app"
+codesign --force --sign - --options runtime --timestamp=none \
+    --entitlements "$root/cmake/Zarescope.entitlements" "$app"
 codesign --verify --strict --deep --verbose=1 "$app"
 
 step "Checking the bundle"
@@ -67,7 +68,10 @@ fi
 # 3. Apple Silicon, and the minimum macOS from the Info.plist.
 lipo -archs "$exe" | grep -qx arm64 || fail "the executable isn't arm64-only"
 minimum=$(plutil -extract LSMinimumSystemVersion raw "$app/Contents/Info.plist")
-# 4. Everything the app reads at start-up is in the bundle.
+# 4. The location entitlement (Settings › Use my current location).
+codesign -d --entitlements - "$app" 2>/dev/null | grep -q personal-information.location ||
+    fail "the location entitlement is missing"
+# 5. Everything the app reads at start-up is in the bundle.
 for file in zarescope.tokens.json presets.json sat_catalog.json Zarescope.icns \
             fonts/Inter-Regular.ttf fonts/JetBrainsMonoNL-Regular.ttf; do
     [ -f "$app/Contents/Resources/$file" ] || fail "missing from the bundle: $file"

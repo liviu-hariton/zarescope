@@ -186,6 +186,7 @@ The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted
   "zarescopeSettings": 1,
   "theme": "dark",
   "language": "en",
+  "textSize": "standard",
   "station": { "latDeg": 44.4268, "lonDeg": 26.1025, "altitudeM": 80.0 },
   "minElevationDeg": 20.0,
   "autoRecord": false,
@@ -201,6 +202,7 @@ The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted
 |---|---|
 | `theme` | `dark` or `light` |
 | `language` | `en` or `ro` |
+| `textSize` | `standard`, `large` or `larger`: the whole interface at 100 %, 110 % or 120 % |
 | `station` | the station, or `null` when not set; latitude ±90, longitude ±180, altitude −500…9000 m |
 | `minElevationDeg` | passes below this are not listed or recorded (0–60) |
 | `autoRecord` | the pass scheduler is on at start-up |
