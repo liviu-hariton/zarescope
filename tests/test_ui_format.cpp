@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The UI's pure helpers: number formats (DESIGN.md §3) and the waterfall's
-// row-to-pixel mapping.
+// The UI's pure helpers: number formats (DESIGN.md §3), the units chosen in
+// Settings, and the waterfall's row-to-pixel mapping.
 
 #include "ui/Format.h"
+#include "ui/Units.h"
 #include "ui/WaterfallColors.h"
 
 #include <doctest/doctest.h>
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -86,6 +88,61 @@ TEST_CASE("format: axis ticks are round and signed values use a true minus") {
     CHECK(formatSigned(-42.3, 1) == std::string(kMinus) + "42.3");
     CHECK(formatSigned(-0.01, 1) == "0.0");  // no "−0.0"
     CHECK(formatSigned(12.0, 0) == "12");
+}
+
+TEST_CASE("format: thousands are split by a thin space, negatives use a true minus") {
+    CHECK(formatThousands(0) == "0");
+    CHECK(formatThousands(950) == "950");
+    CHECK(formatThousands(36'000) == "36" + kThin + "000");
+    CHECK(formatThousands(1'234'567) == "1" + kThin + "234" + kThin + "567");
+    CHECK(formatThousands(-1000) == std::string(kMinus) + "1" + kThin + "000");
+}
+
+TEST_CASE("units: the settings key round-trips, unknown keys read as metric") {
+    for (UnitSystem system : {UnitSystem::Metric, UnitSystem::Aviation, UnitSystem::Imperial}) {
+        CHECK(unitSystemFromKey(unitSystemKey(system)) == system);
+    }
+    CHECK(unitSystemFromKey("") == UnitSystem::Metric);
+    CHECK(unitSystemFromKey("furlongs") == UnitSystem::Metric);
+}
+
+TEST_CASE("units: altitude, speed and distance in each system") {
+    // 36 000 ft = 10 972.8 m; 452 kt = 837.1 km/h = 520.2 mph; 18.52 km = 10 NM.
+    auto text = [](const Measurement& m) { return m.value + " " + std::string(m.unit); };
+    CHECK(text(formatAltitude(36'000, UnitSystem::Metric)) == "10" + kThin + "973 m");
+    CHECK(text(formatAltitude(36'000, UnitSystem::Aviation)) == "36" + kThin + "000 ft");
+    CHECK(text(formatAltitude(36'000, UnitSystem::Imperial)) == "36" + kThin + "000 ft");
+    CHECK(text(formatAltitude(-1000, UnitSystem::Metric)) == std::string(kMinus) + "305 m");
+    CHECK(text(formatSpeed(452.0, UnitSystem::Metric)) == "837 km/h");
+    CHECK(text(formatSpeed(452.0, UnitSystem::Aviation)) == "452 kt");
+    CHECK(text(formatSpeed(452.0, UnitSystem::Imperial)) == "520 mph");
+    CHECK(text(formatDistance(18.52, UnitSystem::Metric)) == "18.5 km");
+    CHECK(text(formatDistance(18.52, UnitSystem::Aviation)) == "10.0 NM");
+    CHECK(text(formatDistance(16.09344, UnitSystem::Imperial)) == "10.0 mi");
+}
+
+TEST_CASE("units: station height, the Settings summary and the radar ranges") {
+    CHECK(heightUnit(UnitSystem::Metric) == "m");
+    CHECK(heightUnit(UnitSystem::Aviation) == "ft");
+    CHECK(metresPerHeightUnit(UnitSystem::Imperial) == doctest::Approx(0.3048));
+    CHECK(unitSummary(UnitSystem::Metric) == "m · km/h · km");
+    CHECK(unitSummary(UnitSystem::Aviation) == "ft · kt · NM");
+    CHECK(unitSummary(UnitSystem::Imperial) == "ft · mph · mi");
+    for (UnitSystem system : {UnitSystem::Metric, UnitSystem::Aviation, UnitSystem::Imperial}) {
+        const auto ranges = radarRanges(system);
+        REQUIRE_FALSE(ranges.empty());
+        for (size_t i = 0; i < ranges.size(); ++i) {
+            // Rings at quarters of the range get whole-number labels.
+            CHECK(std::fmod(ranges[i], 4.0) == 0.0);
+            if (i > 0) {
+                CHECK(ranges[i] > ranges[i - 1]);
+            }
+        }
+        // Every system reaches about the same distance (≈ 400 km).
+        const double farthestKm = ranges.back() * kmPerDistanceUnit(system);
+        CHECK(farthestKm > 380.0);
+        CHECK(farthestKm < 420.0);
+    }
 }
 
 TEST_CASE("waterfall: levels map floor → 0 and ceiling → 255, clamped") {

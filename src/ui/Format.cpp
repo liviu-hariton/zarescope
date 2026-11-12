@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 
 namespace zarescope::ui {
@@ -137,6 +138,19 @@ std::string formatSigned(double value, int decimals) {
         return std::string(kMinus) + text;
     }
     return text;
+}
+
+std::string formatThousands(int value) {
+    const bool negative = value < 0;
+    std::string digits = std::to_string(std::abs(value));
+    std::string out;
+    const size_t first = digits.size() % 3 == 0 ? 3 : digits.size() % 3;
+    out += digits.substr(0, first);
+    for (size_t i = first; i < digits.size(); i += 3) {
+        out += kThinSpace;
+        out += digits.substr(i, 3);
+    }
+    return negative ? std::string(kMinus) + out : out;
 }
 
 }  // namespace zarescope::ui

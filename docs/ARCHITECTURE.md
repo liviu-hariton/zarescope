@@ -209,6 +209,7 @@ PassAutomation::update(now, passes)
   - **Row resampling.** FFT bins are reduced to the texture width by taking the strongest bin per column, so narrow carriers survive.
   - **Level range.** It fits the first trace of each source (`suggestRange`). Changing it repaints the texture from the stored levels.
 - **Themes.** `applyTheme` (ImGui) and `applyPlotTheme` (ImPlot) map every colour slot to a token, and the native title bar follows through `platform::setWindowAppearance`.
+- **Units** (`ui/Units`). Metric (m, km/h, km), aviation (ft, kt, NM) or imperial (ft, mph, mi). Only the display converts: decoders, settings and the journal keep their own units (`altitudeFt`, `groundSpeedKt`, kilometres, `altitudeM`), and `AircraftView` and Settings call `formatAltitude`, `formatSpeed`, `formatDistance` at the last step. The radar picks its range from round numbers in the displayed unit.
 - **Text size** (100, 110 or 120 %). `applyInterfaceScale` tells Dear ImGui the window is that much smaller and its pixels that much denser, so every size, gap and plot grows together and the fonts are rasterized sharp at the new density. Mouse positions already queued for the frame are converted too, which is why input trickling is off.
 
 ## macOS integration (`src/platform/macos`)

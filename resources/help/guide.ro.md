@@ -102,6 +102,7 @@ Tabul Jurnal păstrează ce s-a recepționat: fiecare pasaj de satelit și rezul
 |---|---|
 | Temă | Întunecată sau luminoasă. |
 | Mărimea textului | Standard, Mare sau Foarte mare: crește toată interfața, textul și controalele împreună. Și cu ⌘+, ⌘- și ⌘0. |
+| Unități de măsură | Cum se afișează altitudinile, vitezele și distanțele: Metrice (m, km/h, km), Aviatice (ft, kt, NM, cum folosesc piloții și controlorii de trafic) sau Imperiale (ft, mph, mi). Altitudinea stației le urmează și ea. |
 | Locația stației | Latitudinea, longitudinea și altitudinea; Folosește locația mea actuală o cere de la macOS (îți cere permisiunea prima dată). |
 | Elevația minimă a pasajelor | Pasajele mai joase nu apar în listă și nu se înregistrează. |
 | Înregistrează și decodează automat pasajele | Același comutator ca în tabul Sateliți. |

@@ -1301,7 +1301,7 @@ void MainWindow::drawAircraftArea(ImVec2 origin, ImVec2 size) {
         }
         return;
     }
-    m_aircraftView.draw(m_ui, inner, innerSize, m_aircraft);
+    m_aircraftView.draw(m_ui, inner, innerSize, m_aircraft, unitSystemFromKey(m_settings.units));
 }
 
 // --- Status bar ---------------------------------------------------------------------
@@ -1794,6 +1794,27 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
             }
         }
     }
+    // Units: how altitudes, speeds and distances are shown. The line under
+    // the choice spells out what the selected one means.
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::UnitsLabel)).c_str());
+    {
+        const UnitSystem units = unitSystemFromKey(m_settings.units);
+        constexpr std::array kSystems{UnitSystem::Metric, UnitSystem::Aviation,
+                                      UnitSystem::Imperial};
+        const std::array<StringId, 3> labels{StringId::UnitsMetric, StringId::UnitsAviation,
+                                             StringId::UnitsImperial};
+        for (size_t i = 0; i < kSystems.size(); ++i) {
+            if (i > 0) {
+                ImGui::SameLine();
+            }
+            if (ImGui::RadioButton(cstr(m_ui.tr(labels[i])).c_str(), units == kSystems[i])) {
+                m_settings.units = unitSystemKey(kSystems[i]);
+            }
+        }
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, m_ui.colorVec("text/secondary"));
+    ImGui::TextUnformatted(unitSummary(unitSystemFromKey(m_settings.units)).c_str());
+    ImGui::PopStyleColor();
     ImGui::Separator();
     // Language names are written in their own language, so each is
     // recognisable whatever the current one is.
@@ -1804,9 +1825,19 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
     ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
     ImGui::InputDouble(cstr(m_ui.tr(StringId::LongitudeLabel)).c_str(), &m_stationLon, 0.0, 0.0,
                        "%.4f");
-    ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
-    ImGui::InputDouble(cstr(m_ui.tr(StringId::AltitudeLabel)).c_str(), &m_stationAlt, 0.0, 0.0,
-                       "%.0f");
+    // The altitude is kept in metres and edited in the chosen unit; it is
+    // only written back when the field changes, so switching units never
+    // rounds a stored value.
+    {
+        const UnitSystem heightUnits = unitSystemFromKey(m_settings.units);
+        const double perUnit = metresPerHeightUnit(heightUnits);
+        double shown = std::round(m_stationAlt / perUnit);
+        const std::string label = m_ui.trf(StringId::AltitudeLabel, heightUnit(heightUnits));
+        ImGui::SetNextItemWidth(kPopoverWidth * 0.5F);
+        if (ImGui::InputDouble(cstr(label).c_str(), &shown, 0.0, 0.0, "%.0f")) {
+            m_stationAlt = shown * perUnit;
+        }
+    }
     m_stationLat = std::clamp(m_stationLat, -90.0, 90.0);
     m_stationLon = std::clamp(m_stationLon, -180.0, 180.0);
     m_stationAlt = std::clamp(m_stationAlt, -500.0, 9000.0);
@@ -1842,10 +1873,14 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
             status = m_ui.tr(StringId::Locating);
         } else if (m_located) {
             switch (m_located->error) {
-            case LocateError::None:
+            case LocateError::None: {
+                const UnitSystem heightUnits = unitSystemFromKey(m_settings.units);
+                const double accuracy =
+                    std::max(1.0, m_located->accuracyM / metresPerHeightUnit(heightUnits));
                 status = m_ui.trf(StringId::LocationFound,
-                                  std::format("{:.0f}", std::max(1.0, m_located->accuracyM)));
+                                  std::format("{:.0f} {}", accuracy, heightUnit(heightUnits)));
                 break;
+            }
             case LocateError::Denied: status = m_ui.tr(StringId::LocationDenied); break;
             case LocateError::Disabled: status = m_ui.tr(StringId::LocationDisabled); break;
             case LocateError::Failed:

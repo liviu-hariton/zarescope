@@ -6,6 +6,7 @@
 //   duration    04:32, 1:02:03
 //   size        8.4 MB, 120 MB
 //   rate        2.4 MS/s, 250 kS/s
+//   thousands   36 000
 
 #pragma once
 
@@ -52,6 +53,9 @@ double niceStep(double span, int targetTicks);
 
 // Decimals needed to tell ticks `step` apart: 0.25 → 2, 0.5 → 1, 2 → 0.
 int decimalsFor(double step);
+
+// "36 000" with a thin space between thousands and a true minus sign.
+std::string formatThousands(int value);
 
 // "−42.3" with a true minus sign (DESIGN.md §3), `decimals` places.
 std::string formatSigned(double value, int decimals);

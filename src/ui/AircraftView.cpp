@@ -23,8 +23,6 @@ constexpr auto kStale = std::chrono::seconds(30);
 // The table takes this share of the width, at most this many points.
 constexpr float kTableShare = 0.45F;
 constexpr float kTableMaxWidth = 680.0F;
-// Radar ranges to choose from (km): the smallest that holds every aircraft.
-constexpr std::array kRanges{25.0, 50.0, 100.0, 200.0, 300.0, 400.0};
 // Clicks within this many points of an aircraft select it.
 constexpr float kPickRadius = 14.0F;
 
@@ -49,31 +47,20 @@ void arrow(ImDrawList& drawList, ImVec2 c, float size, double trackDeg, ImU32 co
 
 }  // namespace
 
-std::string formatThousands(int value) {
-    const bool negative = value < 0;
-    std::string digits = std::to_string(std::abs(value));
-    std::string out;
-    const size_t first = digits.size() % 3 == 0 ? 3 : digits.size() % 3;
-    out += digits.substr(0, first);
-    for (size_t i = first; i < digits.size(); i += 3) {
-        out += kThinSpace;
-        out += digits.substr(i, 3);
-    }
-    return negative ? std::string(kMinus) + out : out;
-}
-
-void AircraftView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store) {
+void AircraftView::draw(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store,
+                        UnitSystem units) {
     if (m_selected && !store.aircraft().contains(*m_selected)) {
         m_selected.reset();
     }
     const float tableWidth = std::min(kTableMaxWidth, size.x * kTableShare);
-    drawTable(ui, pos, ImVec2(tableWidth, size.y), store);
+    drawTable(ui, pos, ImVec2(tableWidth, size.y), store, units);
     const float gap = ui.spacing("16");
     drawRadar(ui, ImVec2(pos.x + tableWidth + gap, pos.y),
-              ImVec2(size.x - tableWidth - gap, size.y), store);
+              ImVec2(size.x - tableWidth - gap, size.y), store, units);
 }
 
-void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store) {
+void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store,
+                             UnitSystem units) {
     const auto now = Clock::now();
     // Closest first; aircraft without a position after them, by callsign.
     std::vector<const Aircraft*> rows;
@@ -136,7 +123,9 @@ void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
     }
 
     // A cell's number right-aligned in mono with its unit in secondary.
-    auto number = [&](const std::string& value, std::string_view unit, bool dim) {
+    auto number = [&](const Measurement& m, bool dim) {
+        const std::string& value = m.value;
+        const std::string_view unit = m.unit;
         const auto& mono = ui.face(TypeRole::MonoData);
         const float unitWidth =
             unit.empty() ? 0.0F : ui.textSize(TypeRole::MonoData, unit).x + 4.0F;
@@ -184,27 +173,27 @@ void AircraftView::drawTable(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
         }
         ImGui::TableSetColumnIndex(2);
         if (aircraft->altitudeFt) {
-            number(formatThousands(*aircraft->altitudeFt), "ft", stale);
+            number(formatAltitude(*aircraft->altitudeFt, units), stale);
         }
         ImGui::TableSetColumnIndex(3);
         if (aircraft->groundSpeedKt) {
-            number(std::format("{:.0f}", *aircraft->groundSpeedKt), "kt", stale);
+            number(formatSpeed(*aircraft->groundSpeedKt, units), stale);
         }
         ImGui::TableSetColumnIndex(4);
         if (station && aircraft->position) {
-            number(std::format("{:.1f}", adsb::distanceKm(*station, *aircraft->position)), "km",
-                   stale);
+            number(formatDistance(adsb::distanceKm(*station, *aircraft->position), units), stale);
         }
         ImGui::TableSetColumnIndex(5);
         const auto seen =
             std::chrono::duration_cast<std::chrono::seconds>(now - aircraft->lastSeen).count();
-        number(std::to_string(std::max<int64_t>(seen, 0)), "s", stale);
+        number({std::to_string(std::max<int64_t>(seen, 0)), "s"}, stale);
         ImGui::PopID();
     }
     ImGui::EndTable();
 }
 
-void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store) {
+void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::AircraftStore& store,
+                             UnitSystem units) {
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     const auto& station = store.station();
     const ImVec2 max(pos.x + size.x, pos.y + size.y);
@@ -221,20 +210,24 @@ void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
         return;
     }
 
-    // Range: the smallest that holds every aircraft.
+    // Range: the smallest that holds every aircraft, in kilometres; the
+    // choices are round numbers in the displayed unit.
+    const double kmPerUnit = kmPerDistanceUnit(units);
+    const auto ranges = radarRanges(units);
     double farthest = 0.0;
     for (const auto& [icao, aircraft] : store.aircraft()) {
         if (aircraft.position) {
             farthest = std::max(farthest, adsb::distanceKm(*station, *aircraft.position));
         }
     }
-    double range = kRanges.back();
-    for (double r : kRanges) {
-        if (farthest * 1.1 <= r) {
-            range = r;
+    double rangeUnits = ranges.back();
+    for (double r : ranges) {
+        if (farthest * 1.1 <= r * kmPerUnit) {
+            rangeUnits = r;
             break;
         }
     }
+    const double range = rangeUnits * kmPerUnit;
     const ImVec2 centre(pos.x + size.x * 0.5F, pos.y + size.y * 0.5F);
     const float radius = std::min(size.x, size.y) * 0.5F - ui.spacing("24");
     const auto scale = static_cast<float>(radius / range);
@@ -251,7 +244,7 @@ void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
     for (int q = 1; q <= 4; ++q) {
         const float r = radius * static_cast<float>(q) / 4.0F;
         drawList.AddCircle(centre, r, ring, 0, ui.border());
-        const std::string text = std::format("{:.0f} km", range * q / 4.0);
+        const std::string text = std::format("{:g} {}", rangeUnits * q / 4.0, distanceUnit(units));
         ui.drawText(drawList, TypeRole::MonoSmall, ImVec2(centre.x + 4.0F, centre.y - r + 2.0F),
                     label, text);
     }
@@ -306,7 +299,8 @@ void AircraftView::drawRadar(UiKit& ui, ImVec2 pos, ImVec2 size, const adsb::Air
         }
         std::string text = nameOf(aircraft);
         if (aircraft.altitudeFt) {
-            text += "\n" + formatThousands(*aircraft.altitudeFt) + " ft";
+            const Measurement altitude = formatAltitude(*aircraft.altitudeFt, units);
+            text += "\n" + altitude.value + " " + std::string(altitude.unit);
         }
         ui.drawText(drawList, TypeRole::MonoSmall, ImVec2(at.x + 10.0F, at.y - 8.0F),
                     ui.color(stale ? "text/disabled" : "text/primary"), text);

@@ -59,6 +59,7 @@ TEST_CASE("settings: round trip through JSON") {
     settings.theme = "light";
     settings.language = "ro";
     settings.textSize = "larger";
+    settings.units = "aviation";
     settings.station = app::StationSetting{44.4268, 26.1025, 80.0};
     settings.minElevationDeg = 25.0;
     settings.autoRecord = true;
@@ -80,10 +81,11 @@ TEST_CASE("settings: bad or missing values fall back to defaults, never fail") {
     warning.clear();
     const auto s = app::parseSettings(R"({
         "theme": "purple", "language": 7, "station": {"latDeg": 123, "lonDeg": 0},
-        "minElevationDeg": 95, "defaultSampleRateSps": 1234, "ppm": 9999,
+        "minElevationDeg": 95, "defaultSampleRateSps": 1234, "ppm": 9999, "units": "furlongs",
         "autoRecord": "yes", "somethingNew": true})", warning);
     CHECK(s.theme == "dark");
     CHECK(s.textSize == "standard");
+    CHECK(s.units == "metric");
     CHECK(s.language == "en");
     CHECK_FALSE(s.station);              // latitude out of range
     CHECK(s.minElevationDeg == 60.0);    // clamped

@@ -62,6 +62,11 @@ Settings parseSettings(std::string_view text, std::string& warning) {
         settings.textSize != "larger") {
         settings.textSize = "standard";
     }
+    read(json, "units", settings.units, warning);
+    if (settings.units != "metric" && settings.units != "aviation" &&
+        settings.units != "imperial") {
+        settings.units = "metric";
+    }
     if (const auto it = json.find("station"); it != json.end() && it->is_object()) {
         StationSetting station;
         read(*it, "latDeg", station.latDeg, warning);
@@ -114,6 +119,7 @@ std::string settingsToJson(const Settings& settings) {
     json["theme"] = settings.theme;
     json["language"] = settings.language;
     json["textSize"] = settings.textSize;
+    json["units"] = settings.units;
     if (settings.station) {
         json["station"] = {{"latDeg", settings.station->latDeg},
                            {"lonDeg", settings.station->lonDeg},

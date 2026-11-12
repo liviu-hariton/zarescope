@@ -39,6 +39,9 @@ struct Settings {
     std::string language = "en";  // "en" or "ro"
     // How big the whole interface is drawn: "standard", "large", "larger".
     std::string textSize = "standard";
+    // How measurements are shown: "metric", "aviation" or "imperial"
+    // (ui/Units.h). Display only: stored values keep their own units.
+    std::string units = "metric";
     std::optional<StationSetting> station;
     double minElevationDeg = 20.0;
     bool autoRecord = false;                  // start the pass scheduler with the app

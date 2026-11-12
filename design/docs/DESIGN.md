@@ -95,8 +95,9 @@ Dark is the default theme. Every token is an opaque hex value, with no alpha sta
 
 - Frequency: `137.900 000 MHz`. MHz with 6 decimals, a thin space after the kHz group. Leading digits use text/primary, trailing zeros use text/secondary.
 - Countdown: `T−04:32`, with the true minus sign.
-- Altitude: `36 000 ft`, with a thin space.
-- Other units: `452 kt`, `18.4 km`, `67°`, `−42.3 dBFS`.
+- Altitude: `10 973 m` or `36 000 ft`, with a thin space.
+- Other units: `837 km/h`, `452 kt`, `18.4 km`, `9.9 NM`, `67°`, `−42.3 dBFS`.
+- Altitude, speed and distance follow Settings › Units: metric (m, km/h, km, the default), aviation (ft, kt, NM) or imperial (ft, mph, mi). Everything else stays SI.
 - Units are always rendered in text/secondary.
 
 **Retina:** load fonts at size × framebuffer scale and set `FontGlobalScale = 1/scale`.
@@ -190,7 +191,7 @@ From top to bottom:
 
 - Leave about 30% slack for Romanian. For example, "Recording Meteor-M N2-4 — 7 min left" becomes "Înregistrare Meteor-M N2-4 — 7 min rămase".
 - Never use fixed-width buttons for text labels. Let them grow, and truncate with an ellipsis only in banners and table cells.
-- Times and numbers are not translated. Unit labels stay SI or aviation (ft, kt).
+- Times and numbers are not translated. Unit symbols are never translated either (m, km/h, ft, kt, NM, mph, mi), only the names of the unit systems.
 
 ## 8. Accessibility
 

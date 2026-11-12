@@ -102,6 +102,7 @@ The Journal tab keeps what was received: every satellite pass and its outcome, t
 |---|---|
 | Theme | Dark or light. |
 | Text size | Standard, Large or Larger: the whole interface grows, text and controls together. Also ⌘+, ⌘- and ⌘0. |
+| Units | How altitudes, speeds and distances are shown: Metric (m, km/h, km), Aviation (ft, kt, NM, as pilots and air traffic control use) or Imperial (ft, mph, mi). The station's altitude follows it too. |
 | Station location | Latitude, longitude and altitude; Use my current location asks macOS (it asks your permission the first time). |
 | Minimum pass elevation | Passes lower than this aren't listed or recorded. |
 | Record and decode passes automatically | The same switch as in the Satellites tab. |

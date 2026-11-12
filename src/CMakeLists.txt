@@ -142,6 +142,7 @@ add_library(zarescope_ui STATIC
     ui/Strings.cpp
     ui/Typography.cpp
     ui/UiKit.cpp
+    ui/Units.cpp
     ui/WaterfallColors.cpp)
 target_link_libraries(zarescope_ui PUBLIC zarescope_theme zarescope_device zarescope_adsb zarescope_sat zarescope_appcore zarescope_store zs_imgui zs_implot)
 zarescope_set_warnings(zarescope_ui)

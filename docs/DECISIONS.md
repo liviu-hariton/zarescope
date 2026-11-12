@@ -421,3 +421,17 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - Sparkle (automatic download and install): it needs a Developer ID-signed, notarized app and an appcast to serve. Too much for an ad-hoc signed app whose users install from a disk image.
   - On by default: an app that receives must not call home unasked.
 
+## 2026-11-12 — A Units setting: metric by default, aviation and imperial on request
+
+- **Decision.** Settings › Units chooses how altitudes, speeds and distances are shown.
+  - **Metric** (the default): m, km/h, km.
+  - **Aviation:** ft, kt, NM, as ADS-B sends them and as pilots and air traffic control use them.
+  - **Imperial:** ft, mph, mi.
+  - **Display only.** Decoders, `settings.json` and the journal keep their units (`altitudeFt`, `groundSpeedKt`, km, `altitudeM`); `ui/Units` converts at the last step. The station's altitude is stored in metres and edited in the chosen unit, written back only when the field changes, so switching units never rounds it.
+  - **Radar.** Range choices are round numbers in each unit, divisible by 4 so the quarter rings get whole-number labels, and each list reaches about 400 km.
+- **Why.** Before this, the Aircraft tab mixed ft, kt and km. The main audience is newcomers in Europe, who read metres and km/h; hobbyists who follow flight trackers expect ft, kt and NM.
+- **Rejected.**
+  - Separate choices per quantity: three settings where one covers what people actually want.
+  - Following the macOS measurement system: macOS has no "aviation" choice, and the app keeps its settings portable to Linux and Windows.
+  - Aviation as the default: it matches the raw data but not what a newcomer reads.
+
