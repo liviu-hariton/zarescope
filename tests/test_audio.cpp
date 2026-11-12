@@ -229,7 +229,7 @@ TEST_CASE("demod: the squelch silences noise and opens on a signal") {
     CHECK(dominantTone(open, kAudioRate).amplitude > 0.3);
 }
 
-TEST_CASE("demod: Off produces nothing; defaults and ranges are sane") {
+TEST_CASE("demod: Off produces nothing, defaults and ranges are sane") {
     AudioDemodulator demod;
     demod.configure(2'400'000, kAudioRate, {});
     std::vector<uint8_t> block(1024, 127);

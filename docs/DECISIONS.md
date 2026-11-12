@@ -336,3 +336,14 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - It stays reachable after the first run, which a one-off dialog wouldn't.
   - It ticks its steps off from the app's real state (location set, receiver running), so it doubles as a checklist.
   - Its texts live in the string table, not in `presets.json`, so they are translated with everything else.
+
+## 2026-11-12 — Packaging: ad-hoc signature with the hardened runtime, notarization on hold
+
+- **Decision.** `tools/package.sh` builds Release in `build-release/`, strips local symbols, and signs the bundle ad hoc (`codesign --sign - --options runtime`). It then checks the result and makes a `.zip` (ditto) and a `.dmg`. Developer ID signing and notarization are on hold, as the user decided on 2026-11-12. `docs/RELEASE.md` has the steps for later.
+- **Why.**
+  - Everything is static or part of macOS, so the bundle needs no embedding or RPATH work.
+  - The hardened runtime now means notarization later only changes the signing identity.
+  - Ad hoc is enough for the user's own Macs, after Gatekeeper's one-time confirmation.
+- **Rejected.**
+  - CPack: a few lines of shell show each step plainly and check the result.
+  - A universal (x86_64) build: the target is Apple Silicon.

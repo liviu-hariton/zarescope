@@ -307,6 +307,7 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     };
     services.journal = s.journal.get();
     services.dataFolder = dataRoot;
+    services.saveAutoRecord = !options.simulatePassSeconds.has_value();
     services.chooseExportFile = [](const std::string& name) {
         return platform::chooseExportFile(name);
     };

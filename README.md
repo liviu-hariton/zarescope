@@ -2,7 +2,9 @@
 
 **Listen to the sky.** A desktop app for RTL-SDR reception: live spectrum, aircraft (ADS-B) and Meteor-M weather satellites in one window, with automatic pass recording and a journal of everything received. Free and open source (GPL-3.0-or-later). Site: [zarescope.eu](https://zarescope.eu).
 
-> **Status: M6, journal, Discovery and settings.**
+> **Status: M7, packaging.** `tools/package.sh` makes a self-contained, ad-hoc signed `Zarescope.app` (zip and dmg) for other Apple Silicon Macs.
+>
+> **M6, journal, Discovery and settings.**
 > - New here? The Discover tab walks you through it: set your location, connect a receiver, then pick FM radio, air traffic, aircraft on radar, amateurs, walkie-talkies or Meteor images, each with the antenna that helps.
 > - The Journal tab keeps every pass, image, aircraft (one row per day) and recording, with search and CSV/JSON export.
 > - Settings (location, theme, language, receiver defaults, data folder, automatic recording) are saved between runs.
@@ -53,6 +55,8 @@ open build/Zarescope.app --args --station 44.4268,26.1025 --tab satellites
 For satellite images, install SatDump separately (`brew install --cask satdump`); Zarescope finds it in `/Applications` and runs it after each pass. Without it, everything else works and the Satellites tab says how to install it. To try the whole chain without waiting for a pass: `--open` a 137.9 MHz recording and add `--simulate-pass 60`.
 
 Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
+
+**A copy for another Mac:** `tools/package.sh` builds, signs (ad hoc) and checks a Release `Zarescope.app` and packs it as a `.zip` and a `.dmg` in `build-release/dist/`; [docs/RELEASE.md](docs/RELEASE.md) explains how to open it there the first time.
 
 Run from a terminal to see start-up errors: `build/Zarescope.app/Contents/MacOS/Zarescope`.
 

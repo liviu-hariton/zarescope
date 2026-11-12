@@ -212,3 +212,27 @@ SatDump 1.2.2 was installed with `brew install --cask satdump`, and its command 
 
 - The journal has no date-range control in the UI yet (the filter supports it).
 - Tooltips cover the main controls, not every field of every popover.
+
+## M7 — Packaging 🟡 (built and checked on this Mac; a second Mac hasn't been tried)
+
+- [x] Self-contained `.app`:
+  - every third-party library is static, and libcurl and SQLite come from macOS, so there are no dylibs to embed and no RPATH to fix;
+  - it has the icon;
+  - the `Info.plist` is complete. macOS has no Info.plist key for the notification permission (docs/RELEASE.md).
+- [x] `tools/package.sh`:
+  - Release build and tests;
+  - strip, then ad-hoc signature with the hardened runtime over the whole bundle;
+  - checks: system libraries only, no build-machine paths, arm64, resources present;
+  - `.zip` (ditto) and `.dmg` with an Applications link.
+- [x] `docs/RELEASE.md`: building, installing on another Mac (Gatekeeper's first-open steps), what the app writes, and the Developer ID and notarization steps, on hold by decision.
+
+**Acceptance.**
+
+| Criterion | Status |
+|---|---|
+| The app copied to another Apple Silicon Mac, with only SatDump installed separately, starts and works | 🟡 The `.zip` unpacked to another folder on this Mac starts with the hardened runtime. It ran a whole simulated pass and launched SatDump 1.2.2. `codesign --verify --strict` passes on the copy. A second Mac hasn't been tried. |
+
+**Left for later.**
+
+- Developer ID signing and notarization (on hold, 2026-11-12).
+- Opening `.cu8` files from Finder (a document type) isn't there yet.

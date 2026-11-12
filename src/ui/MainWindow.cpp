@@ -388,7 +388,7 @@ void MainWindow::saveSettingsIfChanged(const ShellState& state) {
     m_settings.theme = state.variant == theme::ThemeVariant::Light ? "light" : "dark";
     m_settings.language = state.language == Language::Romanian ? "ro" : "en";
     m_settings.minElevationDeg = std::round(static_cast<double>(m_minElevation));
-    if (m_services.automation != nullptr) {
+    if (m_services.automation != nullptr && m_services.saveAutoRecord) {
         m_settings.autoRecord = m_automation.enabled;
     }
     if (m_tab == Tab::Discover) {

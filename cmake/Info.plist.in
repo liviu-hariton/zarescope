@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later
      Info.plist template for Zarescope.app. CMake fills in the ${...} values
-     from the target properties set in src/app/CMakeLists.txt. -->
+     from the target properties set in src/app/CMakeLists.txt.
+
+     No permission strings are needed: macOS has no Info.plist usage key for
+     notifications (UNUserNotificationCenter asks the user with the app's
+     name), the app records no audio and is not sandboxed, and USB access
+     needs no entitlement outside the sandbox. docs/RELEASE.md. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -24,6 +29,12 @@
     <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
     <key>CFBundleShortVersionString</key>
     <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
     <key>CFBundleVersion</key>

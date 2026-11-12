@@ -221,7 +221,7 @@ TEST_CASE("scheduler: a pass is due from AOS while enough of it is left") {
     CHECK_FALSE(scheduler.due(kT0 + 31s, shortPass));
 }
 
-TEST_CASE("scheduler: overlapping passes go to the higher one; done passes never return") {
+TEST_CASE("scheduler: overlapping passes go to the higher one, done passes never return") {
     sat::PassScheduler scheduler({meteor(57166, "N2-3"), meteor(59051, "N2-4")});
     std::vector passes{pass(57166, "N2-3", 0min, 14min, 25), pass(59051, "N2-4", 3min, 14min, 70)};
 
@@ -390,7 +390,7 @@ TEST_CASE("satdump: images are collected, the log and pass.json saved, the baseb
     CHECK_FALSE(fs::exists(dir.path / "meteor.satdump"));  // scratch folder gone
 }
 
-TEST_CASE("satdump: no image keeps the recording; a missing SatDump fails once") {
+TEST_CASE("satdump: no image keeps the recording, a missing SatDump fails once") {
     const TempDir dir;
     const fs::path baseband = writeMeteorRecording(dir.path, 4096);
     {

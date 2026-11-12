@@ -89,6 +89,9 @@ struct MainWindowServices {
     std::function<std::optional<std::filesystem::path>()> chooseFolder;
     // Where the data actually lives this run (the default or the setting).
     std::filesystem::path dataFolder;
+    // False for a run whose automatic recording was switched on by a test
+    // flag (--simulate-pass): that switch isn't saved.
+    bool saveAutoRecord = true;
 };
 
 class MainWindow {
