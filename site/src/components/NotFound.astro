@@ -1,0 +1,24 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// The "page not found" page, in each language.
+import Base from "../layouts/Base.astro";
+import { routes, t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const n = t(lang).notFound;
+---
+<Base lang={lang} page="404" title={n.title} description={n.lede} noindex>
+  <div class="wrap page nf">
+    <p class="code mono">404 · 0.000 000 MHz</p>
+    <h1 class="page-title">{n.title}</h1>
+    <p class="lede">{n.lede}</p>
+    <a class="btn btn-secondary" href={routes[lang].home}>{n.home}</a>
+  </div>
+</Base>
+
+<style>
+  .nf { min-height: 50vh; }
+  .code { color: var(--text-3); margin-bottom: var(--s3); }
+  .lede { color: var(--text-2); font-size: 20px; margin: var(--s4) 0 var(--s6); max-width: 32em; }
+</style>

@@ -1,0 +1,3 @@
+# Missing pages under /ro/ get the Romanian "page not found" (the rest of the
+# site's settings come from the .htaccess at the root).
+ErrorDocument 404 /ro/404/

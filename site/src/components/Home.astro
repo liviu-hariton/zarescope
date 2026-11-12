@@ -1,0 +1,406 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The home page ("the horizon line", docs/DECISIONS.md). The first screen is
+// the sky Zarescope listens to: a Meteor-M pass arcing over the horizon (solid
+// where flown, dotted ahead, as in the app's sky plot), aircraft crossing, and
+// below the horizon a live waterfall in the app's Zare Deep colours, its bright
+// bands the FM stations. Each label follows what it names. The scene is an
+// illustration, and says so. Below: what you can receive, a pass recorded by
+// itself, the guidance for beginners, what you need, plain facts, and the action.
+import { readFileSync } from "node:fs";
+import Base from "../layouts/Base.astro";
+import DownloadButton from "./DownloadButton.astro";
+import Shot from "./Shot.astro";
+import Icon from "./Icon.astro";
+import { repoRoot, softwareJsonLd, version } from "../data/site";
+import { routes, t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang);
+const h = s.home;
+const r = routes[lang];
+// The waterfall's colour ramp, straight from the app's design tokens.
+const lut: string[] = JSON.parse(readFileSync(repoRoot + "design/tokens/zarescope.tokens.json", "utf8")).waterfall.lut256;
+---
+<Base lang={lang} page="home" title={h.title} description={h.description}
+      jsonLd={softwareJsonLd(lang, new URL(r.home, Astro.site).href, h.description)}>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="sky" data-sky data-lut={lut.join(",")} aria-hidden="true">
+      <canvas class="waterfall" data-waterfall></canvas>
+      <svg class="scene" viewBox="0 0 1440 880" preserveAspectRatio="xMaxYMax slice">
+        <defs>
+          <linearGradient id="horizon" x1="0" x2="1">
+            <stop offset="0" stop-color="var(--border-strong)" />
+            <stop offset="0.55" stop-color="var(--text)" />
+            <stop offset="1" stop-color="var(--border-strong)" />
+          </linearGradient>
+        </defs>
+        <path class="pass-ahead" d="M 860 640 C 980 40, 1580 40, 1720 640" />
+        <path class="pass-flown" data-pass d="M 860 640 C 980 40, 1580 40, 1720 640" />
+        <g class="planes">
+          <!-- The app's aircraft mark (design/icons/aircraft.svg), nose along the track. -->
+          <path class="plane" data-plane="air" d="M12 2.8c.8 0 1.4.7 1.4 1.6v4.8l7 4.3v1.9l-7-2.1v4.4l2.3 1.7v1.5L12 20.1l-3.7.8v-1.5l2.3-1.7v-4.4l-7 2.1v-1.9l7-4.3V4.4c0-.9.6-1.6 1.4-1.6z" transform="translate(1036 474) rotate(62) translate(-12 -12)" />
+          <path class="plane" d="M12 2.8c.8 0 1.4.7 1.4 1.6v4.8l7 4.3v1.9l-7-2.1v4.4l2.3 1.7v1.5L12 20.1l-3.7.8v-1.5l2.3-1.7v-4.4l-7 2.1v-1.9l7-4.3V4.4c0-.9.6-1.6 1.4-1.6z" transform="translate(1300 410) rotate(-32) translate(-12 -12)" />
+          <path class="plane" d="M12 2.8c.8 0 1.4.7 1.4 1.6v4.8l7 4.3v1.9l-7-2.1v4.4l2.3 1.7v1.5L12 20.1l-3.7.8v-1.5l2.3-1.7v-4.4l-7 2.1v-1.9l7-4.3V4.4c0-.9.6-1.6 1.4-1.6z" transform="translate(1190 572) rotate(204) translate(-12 -12)" />
+        </g>
+        <rect class="horizon" x="0" y="639" width="1440" height="2" fill="url(#horizon)" />
+        <circle class="station-mark" data-station cx="980" cy="640" r="0.1" />
+      </svg>
+      <span class="sat" data-sat></span>
+      <span class="tag tag-sat" data-tag="sat"><b>{h.skySat[0]}</b><span>{h.skySat[1]}</span></span>
+      <span class="tag tag-air" data-tag="air"><b>{h.skyAir[0]}</b><span>{h.skyAir[1]}</span></span>
+      <span class="tag tag-fm" data-tag="fm"><b>{h.skyFm[0]}</b><span>{h.skyFm[1]}</span></span>
+    </div>
+    <div class="wrap hero-copy">
+      <h1 id="hero-title">{h.h1}</h1>
+      <p class="lede">{h.lede}</p>
+      <div class="get">
+        <DownloadButton lang={lang} />
+        <p class="meta">{h.meta}<br /><span class="mono">{s.fileLine(version)}</span></p>
+      </div>
+    </div>
+    <p class="wrap sky-caption"><span>{h.skyCaption}</span></p>
+  </section>
+
+  <section class="wrap catch" aria-labelledby="catch-title">
+    <header class="section-head">
+      <h2 id="catch-title">{h.catchTitle}</h2>
+      <p>{h.catchLede}</p>
+    </header>
+    {h.catches.map((c, i) => (
+      <article class:list={["feature", { wide: i === 0, flip: i === 2 }]}>
+        <div class="feature-text">
+          <h3>{c.title}</h3>
+          <p>{c.text}</p>
+        </div>
+        <Shot name={c.id} lang={lang} alt={h.shotAlt[c.id as keyof typeof h.shotAlt]} caption={c.note}
+              tags={[c.tag]} sizes={i === 0 ? "(max-width: 1240px) 100vw, 1200px" : undefined} />
+      </article>
+    ))}
+  </section>
+
+  <section class="pass" aria-labelledby="pass-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h2 id="pass-title">{h.passTitle}</h2>
+        <p>{h.passLede}</p>
+      </header>
+      <ol class="timeline">
+        {h.passSteps.map(([when, what], i) => (
+          <li class:list={[{ rec: i === 1 || i === 2 }]}>
+            <span class="when mono">{when}</span>
+            <span class="dot"></span>
+            <p>{what}</p>
+          </li>
+        ))}
+      </ol>
+      <p class="pass-note">{h.passNote}</p>
+    </div>
+  </section>
+
+  <section class="wrap guide-block" aria-labelledby="guide-title">
+    <div class="guide-text">
+      <h2 id="guide-title">{h.guideTitle}</h2>
+      <p class="sub">{h.guideLede}</p>
+      <ul class="points">{h.guidePoints.map((p) => <li><Icon name="check" size={18} />{p}</li>)}</ul>
+    </div>
+    <Shot name="discover" lang={lang} alt={h.shotAlt.discover} caption={h.guideNote} />
+  </section>
+
+  <section class="wrap facts" aria-label={`${h.needTitle} · ${h.honestTitle}`}>
+    <div>
+      <h2>{h.needTitle}</h2>
+      <dl class="rows">{h.needs.map(([k, v]) => <div class="row"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      <p class="more"><a href={r.download}>{h.needLink}<Icon name="arrow-right" size={16} /></a></p>
+    </div>
+    <div>
+      <h2>{h.honestTitle}</h2>
+      <dl class="rows">{h.honest.map(([k, v]) => <div class="row"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    </div>
+  </section>
+
+  <section class="close" aria-labelledby="close-title">
+    <div class="close-horizon" aria-hidden="true"><canvas data-strip data-lut={lut.join(",")}></canvas></div>
+    <div class="wrap close-inner">
+      <h2 id="close-title">{h.closeTitle}</h2>
+      <div class="get">
+        <DownloadButton lang={lang} />
+        <a class="btn btn-secondary" href={r.guide}>{h.closeGuide}</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* ---- The sky ---------------------------------------------------------- */
+  .hero { position: relative; min-height: clamp(640px, calc(100svh - var(--top-h)), 900px); overflow: hidden; isolation: isolate; }
+  .sky { position: absolute; inset: 0; z-index: -1; }
+  .waterfall { position: absolute; left: 0; width: 100%; }
+  .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pass-ahead { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 1 9; stroke-linecap: round; opacity: 0.75; }
+  .pass-flown { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+  .plane { fill: var(--live); }
+  .sat {
+    position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 5px var(--bg), 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .tag {
+    position: absolute; display: grid; gap: 2px; padding: 8px 12px; white-space: nowrap;
+    font: 400 14px/1.4 var(--mono); color: var(--text-2);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .tag b { font-weight: 500; color: var(--text); }
+  .tag-sat { border-color: color-mix(in srgb, var(--pass) 55%, var(--border)); }
+  .tag-sat b { color: var(--pass); }
+  .tag-air b { color: var(--live); }
+  .tag-fm b { color: var(--accent); }
+  .tag:not(.placed), .sat:not(.placed) { visibility: hidden; }
+
+  .hero-copy { position: relative; padding-top: clamp(64px, 11vh, 132px); }
+  h1 { font-size: clamp(52px, 6.4vw, 92px); line-height: 0.98; letter-spacing: -0.035em; font-weight: 700; max-width: 9em; }
+  .lede { font-size: clamp(19px, 1.6vw, 22px); line-height: 1.5; color: var(--text-2); max-width: 28em; margin-top: var(--s5); }
+  .get { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s4) var(--s5); margin-top: var(--s6); }
+  .meta { font-size: 15px; color: var(--text-2); line-height: 1.5; max-width: 290px; }
+  .meta .mono { font-size: 13px; color: var(--text-3); }
+  .sky-caption { position: absolute; left: 0; right: 0; bottom: 18px; font-size: 13px; color: var(--text-2); }
+  .sky-caption span { background: var(--bg); padding: 4px 10px; border-radius: var(--radius); }
+
+  /* Narrow screens: the words first, then the sky under them. */
+  @media (max-width: 900px) {
+    .hero { min-height: 0; display: flex; flex-direction: column; }
+    .sky { position: relative; order: 2; height: 440px; inset: auto; z-index: 0; }
+    .hero-copy { order: 1; padding-top: 48px; padding-bottom: 16px; }
+    .sky-caption { position: static; order: 3; padding-block: 10px 0; }
+    .sky-caption span { padding: 0; background: none; }
+    .tag-air { display: none; }
+  }
+
+  /* ---- Sections --------------------------------------------------------- */
+  section + section { margin-top: clamp(80px, 11vw, 140px); }
+  .section-head { max-width: 40em; margin-bottom: var(--s7); }
+  .section-head h2, .guide-text h2, .facts h2 { font-size: clamp(30px, 3.4vw, 44px); font-weight: 700; letter-spacing: -0.03em; }
+  .section-head p, .sub { color: var(--text-2); font-size: 19px; margin-top: var(--s3); }
+
+  .feature { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 5vw, 80px); align-items: center; }
+  .feature + .feature { margin-top: clamp(64px, 8vw, 112px); }
+  .feature.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  .feature.flip .feature-text { order: 2; }
+  /* The FM row runs the full width: the waterfall reads best large. */
+  .feature.wide { grid-template-columns: 1fr; gap: var(--s6); }
+  .feature.wide .feature-text { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s3) clamp(32px, 5vw, 80px); align-items: baseline; }
+  .feature.wide h3 { margin: 0; }
+  .feature h3 { font-size: clamp(24px, 2.4vw, 30px); font-weight: 650; letter-spacing: -0.02em; margin-bottom: var(--s3); }
+  .feature-text p:last-child { color: var(--text-2); }
+  @media (max-width: 900px) {
+    .feature, .feature.flip { grid-template-columns: 1fr; }
+    .feature.flip .feature-text { order: 0; }
+    .feature.wide .feature-text { grid-template-columns: 1fr; }
+  }
+
+  /* The pass: a horizon of its own, the four moments on it. */
+  .pass { background: var(--surface); border-block: 1px solid var(--border); padding-block: clamp(64px, 8vw, 104px); }
+  .timeline { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); position: relative; }
+  .timeline::before { content: ""; position: absolute; left: 0; right: 0; top: 44px; height: 2px; background: linear-gradient(90deg, var(--border-strong), var(--text-3) 50%, var(--border-strong)); }
+  .timeline li { position: relative; padding-right: var(--s5); }
+  .when { display: block; font-size: 17px; color: var(--text); height: 32px; }
+  .dot { display: block; width: 14px; height: 14px; margin: 5px 0 20px; border-radius: 50%; background: var(--surface); border: 2px solid var(--text-3); position: relative; }
+  .rec .dot { background: var(--recording); border-color: var(--recording); }
+  .rec .when { color: var(--accent); }
+  .timeline p { color: var(--text-2); }
+  .pass-note { margin-top: var(--s6); font-size: 15px; color: var(--text-3); }
+  @media (max-width: 760px) {
+    .timeline { grid-template-columns: 1fr; gap: var(--s5); padding-left: 28px; }
+    .timeline::before { top: 0; bottom: 0; left: 6px; width: 2px; height: auto; right: auto; background: var(--border-strong); }
+    .dot { position: absolute; left: -28px; top: 5px; margin: 0; }
+    .when { height: auto; }
+  }
+
+  .guide-block { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 5vw, 80px); align-items: center; }
+  .points { list-style: none; padding: 0; margin-top: var(--s5); display: grid; gap: var(--s3); }
+  .points li { display: grid; grid-template-columns: 26px 1fr; color: var(--text-2); }
+  .points :global(svg) { color: var(--success); margin-top: 4px; }
+  @media (max-width: 900px) { .guide-block { grid-template-columns: 1fr; } }
+
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s7) clamp(32px, 5vw, 80px); }
+  .facts h2 { font-size: clamp(26px, 2.6vw, 34px); margin-bottom: var(--s4); }
+  .facts dt { font-weight: 600; }
+  .facts dd { margin: 0; color: var(--text-2); }
+  .more { margin-top: var(--s4); }
+  .more a { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; text-decoration: none; }
+  @media (max-width: 900px) { .facts { grid-template-columns: 1fr; } }
+
+  /* The page closes where it opened: a horizon, and the waterfall under it. */
+  .close { padding-top: 0; }
+  .close-horizon { height: 2px; background: linear-gradient(90deg, var(--border-strong), var(--text) 50%, var(--border-strong)); position: relative; margin-bottom: calc(58px + clamp(40px, 6vw, 72px)); }  /* the 56-px strip, then room */
+  .close-horizon canvas { position: absolute; left: 0; top: 2px; width: 100%; height: 56px; }
+  .close-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s5); }
+  .close h2 { font-size: clamp(32px, 4vw, 52px); font-weight: 700; letter-spacing: -0.03em; }
+  .close .get { margin-top: 0; }
+</style>
+
+<script>
+  // The sky: places the satellite and the labels over the scene (whatever its
+  // scale), moves the satellite along its pass, and scrolls the waterfall. With
+  // reduced motion everything is drawn once and stays still. It pauses while
+  // the hero is off screen or the tab is hidden.
+  const sky = document.querySelector<HTMLElement>("[data-sky]");
+  if (sky) {
+    const svg = sky.querySelector<SVGSVGElement>("svg")!;
+    const flown = sky.querySelector<SVGPathElement>("[data-pass]")!;
+    const sat = sky.querySelector<HTMLElement>("[data-sat]")!;
+    const tags = {
+      sat: sky.querySelector<HTMLElement>('[data-tag="sat"]')!,
+      air: sky.querySelector<HTMLElement>('[data-tag="air"]')!,
+      fm: sky.querySelector<HTMLElement>('[data-tag="fm"]')!,
+    };
+    const plane = sky.querySelector<SVGGraphicsElement>('[data-plane="air"]')!;
+    const station = sky.querySelector<SVGGraphicsElement>("[data-station]")!;
+    const canvas = sky.querySelector<HTMLCanvasElement>("[data-waterfall]")!;
+    const ctx = canvas.getContext("2d")!;
+    const lut = (sky.dataset.lut ?? "").split(",").map((hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const length = flown.getTotalLength();
+    const HORIZON_Y = 640;
+    // FM stations as bands in scene units (x centre, half width, strength 0–1).
+    const stations = [[190, 34, 0.75], [470, 26, 0.95], [700, 18, 0.55], [980, 36, 0.9], [1180, 22, 0.6], [1360, 30, 0.8]];
+
+    let progress = 0.36;  // how much of the pass is flown (it loops 0.12 → 0.6, on screen)
+    const toScreen = (x: number, y: number) => {
+      const m = svg.getScreenCTM()!;
+      const box = sky.getBoundingClientRect();
+      return { x: m.a * x + m.e - box.left, y: m.d * y + m.f - box.top, scale: m.a };
+    };
+    const place = (el: HTMLElement, x: number, y: number) => {
+      el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      el.style.left = "0"; el.style.top = "0";
+      el.classList.add("placed");
+    };
+
+    const layout = () => {
+      flown.style.strokeDasharray = `${length * progress} ${length}`;
+      const p = flown.getPointAtLength(length * progress);
+      const s = toScreen(p.x, p.y);
+      place(sat, s.x, s.y);
+      // The label sits right of the satellite; near the edge it drops below
+      // it, against the edge (the sky inside the arc is empty there; the
+      // words are on the left, so the label never goes that way).
+      const satW = tags.sat.offsetWidth;
+      const edge = sky.clientWidth - 12;
+      const satH = tags.sat.offsetHeight;
+      if (s.x + 22 + satW <= edge) place(tags.sat, s.x + 22, s.y - 24);
+      // On a narrow sky, below the satellite would lie across the arc: above it.
+      else if (sky.clientWidth < 700 && s.y - satH - 18 >= 8) place(tags.sat, Math.max(12, edge - satW), s.y - satH - 18);
+      else place(tags.sat, Math.max(12, edge - satW), s.y + 22);
+      const pr = plane.getBoundingClientRect(), box = sky.getBoundingClientRect();
+      place(tags.air, pr.right - box.left + 14, pr.top - box.top + 6);
+      const st = station.getBoundingClientRect();
+      const horizon = toScreen(0, HORIZON_Y).y;
+      place(tags.fm, st.left - box.left - 40, horizon + 26);
+      // Keep the other labels inside the sky.
+      for (const tag of [tags.air, tags.fm]) {
+        const t = tag.getBoundingClientRect();
+        if (t.right > box.right - 12) tag.style.transform += ` translateX(${box.right - 12 - t.right}px)`;
+      }
+      canvas.style.top = `${horizon + 1}px`;
+      canvas.style.height = `${box.height - horizon - 1}px`;
+    };
+
+    // ---- The waterfall: one new row at the top, the rest moving down. ----
+    let rowBuffer: ImageData | null = null;
+    const sizeCanvas = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+      if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width = w; canvas.height = h;
+        rowBuffer = ctx.createImageData(w, 1);
+        for (let y = 0; y < h; y += 1) drawRow(y);
+      }
+    };
+    const drawRow = (y = 0) => {
+      if (!rowBuffer) return;
+      const w = canvas.width, data = rowBuffer.data;
+      const box = sky.getBoundingClientRect();
+      const m = svg.getScreenCTM()!;
+      const toX = (x: number) => ((m.a * x + m.e - box.left) / box.width) * w;
+      const level = new Float32Array(w);
+      for (let i = 0; i < w; i += 1) level[i] = 0.03 + Math.random() * 0.07;
+      const t = performance.now() / 1000;
+      for (const [cx, half, strength] of stations) {
+        const c = toX(cx), hw = Math.max(2, (half * m.a / box.width) * w);
+        // Each station breathes a little: real ones fade with what they broadcast.
+        const swing = 0.86 + 0.14 * Math.sin(t * 0.7 + cx);
+        const from = Math.max(0, Math.floor(c - hw)), to = Math.min(w - 1, Math.ceil(c + hw));
+        for (let i = from; i <= to; i += 1) {
+          const edge = 1 - Math.pow(Math.abs(i - c) / hw, 6);
+          level[i] = Math.max(level[i], strength * swing * (0.74 + Math.random() * 0.2) * edge);
+        }
+      }
+      for (let i = 0; i < w; i += 1) {
+        const [r, g, b] = lut[Math.min(255, Math.floor(level[i] * 255))] ?? [7, 10, 18];
+        data[i * 4] = r; data[i * 4 + 1] = g; data[i * 4 + 2] = b; data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(rowBuffer, 0, y);
+    };
+    const scroll = () => {
+      const step = Math.max(1, Math.round(Math.min(devicePixelRatio || 1, 2)));
+      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height - step, 0, step, canvas.width, canvas.height - step);
+      for (let y = 0; y < step; y += 1) drawRow(y);
+    };
+
+    let running = false, last = 0, rowAt = 0, frame = 0;
+    const PASS_SECONDS = 70;
+    const tick = (now: number) => {
+      frame = 0;
+      if (!running) return;
+      const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+      last = now;
+      progress += dt / PASS_SECONDS;
+      if (progress > 0.6) progress = 0.12;
+      if (now - rowAt > 70) { rowAt = now; scroll(); }
+      layout();
+      frame = requestAnimationFrame(tick);
+    };
+    const start = () => { if (!still && !running) { running = true; last = 0; frame = requestAnimationFrame(tick); } };
+    const stop = () => { running = false; if (frame) cancelAnimationFrame(frame); frame = 0; };
+
+    const refresh = () => { sizeCanvas(); layout(); };
+    new ResizeObserver(refresh).observe(sky);
+    refresh();
+    if (!still) {
+      new IntersectionObserver(([e]) => (e.isIntersecting && !document.hidden ? start() : stop())).observe(sky);
+      document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+    }
+  }
+
+  // The close: one still frame of the same waterfall (same colour ramp, noise
+  // and FM bands as the hero), redrawn only when its width changes.
+  for (const strip of document.querySelectorAll<HTMLCanvasElement>("[data-strip]")) {
+    const lut = (strip.dataset.lut ?? "").split(",").map((hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+    const bands = [[0.12, 0.022, 0.75], [0.31, 0.016, 0.95], [0.46, 0.01, 0.55], [0.63, 0.024, 0.9], [0.78, 0.014, 0.6], [0.92, 0.02, 0.8]];
+    const draw = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const w = Math.round(strip.clientWidth * dpr), h = Math.round(strip.clientHeight * dpr);
+      if (!w || !h || strip.width === w) return;
+      strip.width = w; strip.height = h;
+      const ctx = strip.getContext("2d")!;
+      const image = ctx.createImageData(w, h);
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          let level = 0.03 + Math.random() * 0.07;
+          for (const [c, half, strength] of bands) {
+            const d = Math.abs(x / w - c) / half;
+            if (d < 1) level = Math.max(level, strength * (0.74 + Math.random() * 0.2) * (1 - Math.pow(d, 6)));
+          }
+          const [r, g, b] = lut[Math.min(255, Math.floor(level * 255))] ?? [7, 10, 18];
+          const i = (y * w + x) * 4;
+          image.data[i] = r; image.data[i + 1] = g; image.data[i + 2] = b; image.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+    };
+    new ResizeObserver(draw).observe(strip);
+    draw();
+  }
+</script>

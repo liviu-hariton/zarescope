@@ -42,6 +42,7 @@
 #include <sstream>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -278,7 +279,13 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     // trickling would carry some over to the next frame and convert them twice.
     io.ConfigInputTrickleEventQueue = false;
 
-    const platform::AppPaths paths = platform::appPaths();
+    platform::AppPaths paths = platform::appPaths();
+    // ZARESCOPE_HOME (development): use that folder instead of Application
+    // Support for settings, journal and data, so screenshots and tests never
+    // touch the user's own (tools/capture-site-images.sh).
+    if (const char* home = std::getenv("ZARESCOPE_HOME"); home != nullptr && home[0] != '\0') {
+        paths.userData = home;
+    }
     s.tokens = theme::DesignTokens::fromFile(paths.resources / "zarescope.tokens.json");
 
     std::string error;

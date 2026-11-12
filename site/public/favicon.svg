@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><style>.r{stroke:#121624}.p{stroke:#C06A00}.d{fill:#C06A00}@media (prefers-color-scheme: dark){.r{stroke:#E8EBF4}.p{stroke:#FFB547}.d{fill:#FFB547}}</style>
+<defs><mask id="k" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16"><rect width="16" height="16" fill="#fff"/><circle cx="8.8" cy="5.46" r="2.9" fill="#000"/></mask></defs>
+<g mask="url(#k)" fill="none" stroke-linecap="round"><circle class="r" cx="8" cy="8" r="6.5" stroke-width="1.5"/><path class="p" d="M2.6 11.2C5 6.5 9.5 4 14.3 5.3" stroke-width="1.5"/></g><circle class="d" cx="8.8" cy="5.46" r="1.9"/></svg>

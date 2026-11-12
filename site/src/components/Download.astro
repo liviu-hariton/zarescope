@@ -1,0 +1,77 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The download page: the disk image, what it needs, and the one-time macOS
+// confirmation an app that isn't notarized asks for.
+import Base from "../layouts/Base.astro";
+import DownloadButton from "./DownloadButton.astro";
+import Icon from "./Icon.astro";
+import { releasesUrl, repoUrl, softwareJsonLd, version } from "../data/site";
+import { routes, t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang);
+const d = s.downloadPage;
+---
+<Base lang={lang} page="download" title={d.title} description={d.description}
+      jsonLd={softwareJsonLd(lang, new URL(routes[lang].download, Astro.site).href, d.description)}>
+  <div class="wrap page">
+    <header class="head">
+      <h1 class="page-title">{d.title}</h1>
+      <p class="lede">{d.lede}</p>
+      <div class="get">
+        <DownloadButton lang={lang} />
+        <span class="file mono">{s.fileLine(version)}</span>
+      </div>
+      <p class="early">{s.early}</p>
+    </header>
+
+    <section id="mac" class="mac" aria-labelledby="mac-title">
+      <h2 id="mac-title">{d.macTitle}</h2>
+      <p class="sub">{d.macText}</p>
+    </section>
+
+    <section aria-labelledby="req">
+      <h2 id="req">{d.reqTitle}</h2>
+      <dl class="rows">{d.reqs.map(([k, v]) => <div class="row"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    </section>
+
+    <section aria-labelledby="first">
+      <h2 id="first">{d.firstTitle}</h2>
+      <p class="sub">{d.firstLede}</p>
+      <ol class="steps">{d.first.map((x) => <li>{x}</li>)}</ol>
+    </section>
+
+    <section aria-labelledby="why">
+      <h2 id="why">{d.whyTitle}</h2>
+      <p class="sub">{d.why} <a class="gh-link" href={`${repoUrl}#building-macos-apple-silicon`}><Icon name="github" size={15} />{d.buildLink}</a></p>
+    </section>
+
+    <section aria-labelledby="other">
+      <h2 id="other">{d.otherTitle}</h2>
+      <p class="sub">{d.other} <a class="gh-link" href={releasesUrl}><Icon name="github" size={15} />{d.otherLink}</a></p>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .head, section { max-width: 780px; }
+  .lede { color: var(--text-2); font-size: 20px; margin-top: var(--s4); }
+  .get { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5); margin-top: var(--s6); }
+  .file { font-size: 14px; color: var(--text-3); }
+  .early { margin-top: var(--s4); color: var(--text-2); font-size: 15px; padding-left: 18px; position: relative; }
+  .early::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 8px; height: 8px; border-radius: 50%; background: var(--pass); }
+  .mac { display: none; }
+  @media (hover: none) and (pointer: coarse) { .mac { display: block; } }
+  section { margin-top: var(--s8); }
+  h2 { font-size: 24px; font-weight: 650; margin-bottom: var(--s4); }
+  .sub { color: var(--text-2); max-width: 36em; margin-bottom: var(--s4); }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--text-2); }
+  .steps { list-style: none; counter-reset: step; padding: 0; border-top: 1px solid var(--border); }
+  .steps li { counter-increment: step; display: grid; grid-template-columns: 40px 1fr; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .steps li::before { content: counter(step) "."; color: var(--text-3); font-family: var(--mono); }
+  .gh-link { white-space: nowrap; }
+  .gh-link :global(svg) { display: inline-block; vertical-align: -2px; margin-right: 5px; }
+</style>

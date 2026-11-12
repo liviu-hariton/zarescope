@@ -1,0 +1,60 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The user guide: the app's own resources/help/guide.<lang>.md, the file the
+// Help tab shows, rendered as it is, so the site and the app never disagree.
+// On wide screens an "On this page" rail sits on the left, like the app's Help.
+import Base from "../layouts/Base.astro";
+import * as en from "../../../resources/help/guide.en.md";
+import * as ro from "../../../resources/help/guide.ro.md";
+import { t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang).guidePage;
+const doc = lang === "ro" ? ro : en;
+const headings = doc.getHeadings().filter((h) => h.depth === 2);
+---
+<Base lang={lang} page="guide" title={s.title} description={s.description} markdown={lang === "ro" ? "/ro/ghid.md" : "/guide.md"}>
+  <div class="wrap layout">
+    <nav class="rail" aria-label={s.onThisPage}>
+      <p>{s.onThisPage}</p>
+      <ul>{headings.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ul>
+    </nav>
+    <article class="prose guide"><doc.Content /></article>
+  </div>
+</Base>
+
+<style>
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: clamp(32px, 6vw, 96px); padding-top: clamp(40px, 6vw, 72px); }
+  .rail { position: sticky; top: calc(var(--top-h) + var(--s5)); align-self: start; margin-left: -12px; }
+  .rail p { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); padding: 0 12px var(--s2); }
+  .rail ul { list-style: none; padding: 0; display: grid; gap: 2px; }
+  .rail a { display: block; padding: 7px 12px; border-radius: var(--radius); color: var(--text-2); text-decoration: none; font-size: 15px; font-weight: 500; }
+  .rail a:hover { background: var(--hover); color: var(--text); }
+  .rail a[aria-current="true"] { background: var(--accent-soft); color: var(--text); }
+  .guide :global(h1) { font-size: clamp(36px, 4.5vw, 56px); line-height: 1.04; letter-spacing: -0.03em; margin-bottom: var(--s4); }
+  .guide :global(h1 + p) { color: var(--text-2); font-size: 19px; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { position: static; margin-left: 0; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); }
+    .rail ul { display: flex; flex-wrap: wrap; gap: 2px var(--s2); }
+  }
+</style>
+
+<script>
+  // Mark the rail entry for the section being read.
+  const links = [...document.querySelectorAll<HTMLAnchorElement>(".rail a")];
+  const sections = links.map((a) => document.getElementById(decodeURIComponent(a.hash.slice(1))));
+  let frame = 0;
+  const mark = () => {
+    frame = 0;
+    const line = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) + 8 || 120;
+    let current = -1;
+    sections.forEach((h, i) => { if (h && h.getBoundingClientRect().top <= line) current = i; });
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) current = sections.length - 1;
+    links.forEach((a, i) => a.setAttribute("aria-current", String(i === current)));
+  };
+  addEventListener("scroll", () => { frame ||= requestAnimationFrame(mark); }, { passive: true });
+  mark();
+</script>

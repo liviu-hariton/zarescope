@@ -1,0 +1,134 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * The site wears the app's design system (design/docs/DESIGN.md and
+ * design/tokens/zarescope.tokens.json): the same colour tokens in dark and
+ * light, Horizon Amber as the accent, Inter for text and JetBrains Mono for
+ * frequencies, times and numbers. Dark is the default, as in the app; the
+ * visitor's system choice or the theme button can switch to light.
+ * Fonts are served from the site (Fontsource), never from another server. */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  color-scheme: dark;
+  --bg: #080B14;
+  --surface: #0E1320;
+  --raised: #161C2C;
+  --hover: #1E2538;
+  --text: #E8EBF4;
+  --text-2: #9AA3B8;
+  --text-3: #8790A5;  /* faint text: captions, version lines (4.8:1 on the ground) */
+  --border: #252C40;
+  --border-strong: #343C55;
+  --accent: #FFB547;
+  --accent-hover: #FFC56E;
+  --accent-soft: #2E2414;
+  --on-accent: #0B0E1A;
+  --live: #2FD4C4;
+  --recording: #FF5577;
+  --pass: #A99BFF;
+  --pass-soft: #211D3D;
+  --success: #5CD68A;
+  --success-soft: #12291D;
+  --warning: #F2D04B;
+  /* The "Zare Deep" waterfall ramp, the same in both themes. */
+  --wf-0: #070A12; --wf-1: #141B3D; --wf-2: #20306E; --wf-3: #2A4FA0; --wf-4: #2A78B8;
+  --wf-5: #23A3B8; --wf-6: #4FC9A8; --wf-7: #A6E28C; --wf-8: #F2F5C8;
+
+  --sans: "Inter Variable", Inter, system-ui, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+  --radius: 6px; --radius-lg: 10px; --radius-xl: 14px;
+  --top-h: 68px;
+  --page: 1200px;
+  --measure: 37em;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fast: 140ms; --normal: 240ms;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F4F5F9; --surface: #FFFFFF; --raised: #ECEEF4; --hover: #E2E5EE;
+  --text: #121624; --text-2: #4A5268; --text-3: #5A6276;
+  --border: #E2E5EE; --border-strong: #D8DCE6;
+  --accent: #9A5B00; --accent-hover: #864F00; --accent-soft: #FBF0DF; --on-accent: #FFFFFF;
+  --live: #007274; --recording: #C81E4A; --pass: #5B4BC4; --pass-soft: #EEEBFB;
+  --success: #17773F; --success-soft: #E3F2E8; --warning: #7A6200;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #F4F5F9; --surface: #FFFFFF; --raised: #ECEEF4; --hover: #E2E5EE;
+    --text: #121624; --text-2: #4A5268; --text-3: #5A6276;
+    --border: #E2E5EE; --border-strong: #D8DCE6;
+    --accent: #9A5B00; --accent-hover: #864F00; --accent-soft: #FBF0DF; --on-accent: #FFFFFF;
+    --live: #007274; --recording: #C81E4A; --pass: #5B4BC4; --pass-soft: #EEEBFB;
+    --success: #17773F; --success-soft: #E3F2E8; --warning: #7A6200;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { scroll-padding-top: calc(var(--top-h) + 16px); -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--sans);
+  font-size: 17px; line-height: 1.6; font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:not(.btn):hover { color: var(--accent-hover); }
+::selection { background: var(--accent); color: var(--on-accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+p, li, dd { text-wrap: pretty; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.wrap { width: min(100% - 2 * clamp(20px, 5vw, 64px), var(--page)); margin-inline: auto; }
+.skip { position: absolute; left: -9999px; top: 8px; z-index: 20; background: var(--accent); color: var(--on-accent); padding: 8px 14px; border-radius: var(--radius); }
+.skip:focus { left: 16px; }
+.skip:hover { color: var(--on-accent); }
+.page { padding-top: clamp(40px, 6vw, 80px); }
+.page-title { font-size: clamp(36px, 4.5vw, 56px); line-height: 1.04; letter-spacing: -0.03em; font-weight: 700; }
+
+/* Buttons: the app's primary (Horizon Amber) and secondary styles. */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px;
+  border-radius: 8px; font: 600 17px/1 var(--sans); text-decoration: none; cursor: pointer;
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.btn-primary { background: var(--accent); color: var(--on-accent); border: 0; }
+.btn-primary:hover { background: var(--accent-hover); color: var(--on-accent); }
+.btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border-strong); }
+.btn-secondary:hover { background: var(--hover); color: var(--text); }
+
+/* Rows of a label and its explanation, hairlines between: the app's Help style. */
+.rows { border-top: 1px solid var(--border); }
+.rows .row { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: var(--s2) var(--s5); padding: 14px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 640px) { .rows .row { grid-template-columns: 1fr; } }
+
+/* Reading text (the guide, privacy). */
+.prose { max-width: var(--measure); }
+.prose h2 { font-size: 26px; margin: var(--s7) 0 var(--s3); }
+.prose h3 { font-size: 20px; margin: var(--s6) 0 var(--s2); color: var(--text-2); }
+.prose p, .prose ul, .prose ol { margin-bottom: var(--s4); }
+.prose ul, .prose ol { padding-left: 1.3em; }
+.prose li { margin-bottom: var(--s2); }
+.prose li::marker { color: var(--text-3); }
+.prose table { width: 100%; border-collapse: collapse; margin: var(--s4) 0 var(--s5); font-size: 16px; }
+.prose th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); padding: 0 var(--s4) var(--s2) 0; border-bottom: 1px solid var(--border); }
+.prose td { vertical-align: top; padding: 12px var(--s4) 12px 0; border-bottom: 1px solid var(--border); color: var(--text-2); }
+.prose td:first-child { color: var(--text); font-weight: 500; width: 34%; }
+.prose code { font-family: var(--mono); font-size: 0.9em; background: var(--raised); padding: 1px 6px; border-radius: 4px; }
+
+/* Pictures made for one theme: only the one for the current theme shows. */
+.when-dark { display: none; }
+:root[data-theme="dark"] .when-dark { display: revert; }
+:root[data-theme="dark"] .when-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .when-dark { display: revert; }
+  :root:not([data-theme="light"]) .when-light { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

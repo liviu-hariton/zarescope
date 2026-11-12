@@ -390,3 +390,19 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
   - Qt or another toolkit for these windows: the project avoids heavy dependencies (DEPENDENCIES.md), and the app stays a 3 MB bundle.
   - The standard `orderFrontStandardAboutPanel`: it can't show the receive-only note or Copy version info in our style.
   - A second native window for Help: Dear ImGui here draws into one window.
+
+## 2026-11-12 — The website: Astro, static, the app's design system, "the horizon line"
+
+- **Decision.** zarescope.eu is a static Astro site in `site/`, the same setup as obdaryn.eu.
+  - **Languages.** English at `/`, Romanian at `/ro/`.
+  - **Pages.** Home, Download, Guide, Privacy and the 404.
+  - **Look.** The app's tokens: dark by default, light when the visitor's system or the theme button asks.
+  - **Fonts.** Inter and JetBrains Mono, served from the site.
+  - **Home page.** It opens on "the horizon line", chosen by the user from three dealt structures. A Meteor-M pass arcs over a horizon, aircraft cross, and a live waterfall in the Zare Deep ramp shows FM stations below it. The scene is labelled as an illustration.
+  - **Sources.** The version comes from `CMakeLists.txt`, the guide from `resources/help`, the waterfall colours from the tokens.
+- **Why.**
+  - The audience the user chose is curious newcomers, so the first screen shows what they could receive, not the software.
+  - Reading the facts from the repo keeps the site and the app from drifting apart.
+- **Rejected.**
+  - A headline beside a floating screenshot: the category default.
+  - Hosted fonts or analytics: no third-party requests (PRODUCT.md).

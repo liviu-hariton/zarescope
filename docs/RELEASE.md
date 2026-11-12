@@ -60,3 +60,23 @@ Decided on 2026-11-12: not now. When it is wanted, the steps are:
 4. **Staple.** Attach the ticket to the `.dmg` (and the `.app`) with `xcrun stapler staple`, so Gatekeeper accepts it offline.
 
 `tools/package.sh` would take the identity from an environment variable and add steps 3–4. Nothing else in the build changes.
+
+## Publishing a release and the website
+
+1. `tools/package.sh` builds and checks the disk image and the zip (above).
+2. `tools/publish-release.sh` tags `v<version>` and creates the GitHub release with both files and their SHA-256 (needs the GitHub CLI, signed in: `gh auth login`).
+3. `tools/deploy-site.sh` rebuilds the website, so its Download button names the new version, and copies it to zarescope.eu.
+
+Keep this order. The site takes its version from `CMakeLists.txt`, so deploying it before the release exists makes every Download button point to a file that isn't there yet.
+
+## The website
+
+The site at https://zarescope.eu lives in `site/`: Astro, static, English at `/` and Romanian at `/ro/`.
+
+- **What it reads from the repo.** The version comes from `CMakeLists.txt`, the user guide from `resources/help/guide.*.md` (the same files as the app's Help tab), and the waterfall colours from the design tokens. So it changes with the app. It loads nothing from other servers and sets no cookies.
+- **Preview.** `cd site && npm install && npm run dev`, then open http://localhost:4321.
+- **Screenshots.** `tools/capture-site-images.sh`, after building the app, captures the app's tabs in both languages and themes from synthetic recordings and real orbits. It runs each copy in a throwaway data folder (`ZARESCOPE_HOME`), so your own settings and journal are untouched, and captures and closes only the copy it launched.
+- **Social images.** `site/public/og-en.png` and `og-ro.png` are the home page's first screen at 1200 × 630, dark. Take them again when the hero changes, under a new file name, because the server caches them for a long time.
+- **Deploy, one-time setup.** Create `site/.deploy.env` (git-ignored) with `ZARESCOPE_SITE_SSH="user@server"`, an SSH login with a key. Add `ZARESCOPE_SITE_PORT` when SSH isn't on port 22, and `ZARESCOPE_SITE_PATH` when the web root isn't `web/zarescope.eu/public_html/`.
+- **Deploy.** `tools/deploy-site.sh --dry-run` lists what would change. `tools/deploy-site.sh` builds, asks, and `rsync`s `site/dist/` into the HestiaCP web root. It deletes files the build no longer has, but never `.well-known`, which Let's Encrypt uses.
+- **Server settings.** They live in `site/public/.htaccess`: security headers, long caching for the hashed files in `/_astro/`, the 404 page, and `ModPagespeed off`. `site/public/ro/.htaccess` gives `/ro/` its Romanian 404.

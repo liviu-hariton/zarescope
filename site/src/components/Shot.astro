@@ -1,0 +1,56 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// A screenshot of the app (tools/capture-site-images.sh), in the page's language,
+// in both themes: the one matching the site's theme shows. Astro makes the WebP
+// sizes at build time.
+import { Image } from "astro:assets";
+import type { ImageMetadata } from "astro";
+import type { Lang } from "../i18n/ui";
+
+/** A framed mono tag (the hero's tag language) naming one thing in the
+ *  screenshot: the tag hangs above the picture, and a thin leader line runs
+ *  down to a dot on the thing, at x %, y % of the picture, so the tag never
+ *  covers what the screenshot shows. */
+interface Tag { label: string; x: number; y: number }
+interface Props { name: string; lang: Lang; alt: string; caption?: string; sizes?: string; tags?: Tag[] }
+const { name, lang, alt, caption, sizes = "(max-width: 900px) 100vw, 720px", tags = [] } = Astro.props;
+const files = import.meta.glob<{ default: ImageMetadata }>("../assets/screens/*.png", { eager: true });
+const pick = (theme: string) => files[`../assets/screens/${name}-${lang}-${theme}.png`]?.default;
+const dark = pick("dark");
+const light = pick("light");
+if (!dark || !light) throw new Error(`Missing screenshot ${name}-${lang}: run tools/capture-site-images.sh`);
+const widths = [640, 960, 1280];
+---
+<figure class="shot">
+  <div class="frame">
+    <Image class="when-dark" src={dark} alt={alt} widths={widths} sizes={sizes} format="webp" loading="lazy" />
+    <Image class="when-light" src={light} alt={alt} widths={widths} sizes={sizes} format="webp" loading="lazy" />
+    {tags.map((t) => <span class="lead" style={`left: ${t.x}%; height: calc(${t.y}% + 14px)`}></span>)}
+  </div>
+  {tags.map((t) => (
+    <span class:list={["pin", "mono", t.x < 20 ? "from-left" : t.x > 75 ? "from-right" : "centred"]}
+          style={`left: ${t.x}%`}>{t.label}</span>
+  ))}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .shot { margin: 0; position: relative; }
+  .shot:has(.pin) { padding-top: 44px; }
+  .frame { position: relative; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface); box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.6); }
+  .frame :global(img) { width: 100%; height: auto; }
+  /* The tag sits fully above the picture; its leader runs down into it. */
+  .pin {
+    position: absolute; top: 0; z-index: 1; padding: 6px 10px; border-radius: var(--radius); white-space: nowrap;
+    font-size: clamp(12px, 1.1vw, 14px); line-height: 1.3; color: var(--accent);
+    background: var(--surface); border: 1px solid var(--accent);
+  }
+  .pin.centred { transform: translateX(-50%); }
+  .pin.from-left { transform: translateX(-14px); }
+  /* Near the left edge the tag starts at its dot, so it clears the window's title bar. */
+  .pin.from-right { transform: translateX(calc(-100% + 14px)); }
+  .lead { position: absolute; top: -14px; width: 1px; margin-left: -0.5px; background: var(--accent); pointer-events: none; }
+  .lead::after { content: ""; position: absolute; bottom: -4px; left: -3.5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+  figcaption { margin-top: var(--s3); font-size: 14px; color: var(--text-3); }
+</style>

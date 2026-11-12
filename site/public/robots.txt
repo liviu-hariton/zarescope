@@ -1,0 +1,7 @@
+User-agent: *
+# Search engines and AI agents may read and cite these pages; please don't use them to train models.
+# (contentsignals.org: a stated preference, not access control.)
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+
+Sitemap: https://zarescope.eu/sitemap-index.xml

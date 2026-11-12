@@ -1,0 +1,235 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Every page: the head (title, description, language alternates, social card),
+// the top bar (sticky, with the theme button and the language switch), and the
+// footer. No scripts from anywhere else, no cookies: the theme choice stays in
+// the browser's own storage.
+import "../styles/global.css";
+import Icon from "../components/Icon.astro";
+import { routes, t, type Lang, type PageId } from "../i18n/ui";
+import { copyrightYears, issuesUrl, repoUrl } from "../data/site";
+
+interface Props {
+  lang: Lang;
+  page: PageId | "404";
+  title: string;
+  description: string;
+  noindex?: boolean;
+  /** The same content as Markdown (the guide), announced with rel="alternate". */
+  markdown?: string;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+}
+const { lang, page, title: pageTitle, description: pageDescription, noindex = false, markdown, jsonLd } = Astro.props;
+const title = pageTitle.includes("Zarescope") || pageTitle.length + 12 > 65 ? pageTitle : `${pageTitle} · Zarescope`;
+const description = pageDescription.length <= 160
+  ? pageDescription
+  : pageDescription.slice(0, 157).replace(/[\s,;:.(–-]+\S*$/, "") + "…";
+const ld = jsonLd && JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+const s = t(lang);
+const other: Lang = lang === "en" ? "ro" : "en";
+const r = routes[lang];
+const site = Astro.site!;
+const pathIn = (l: Lang) => (page === "404" ? undefined : routes[l][page]);
+const canonical = pathIn(lang) && new URL(pathIn(lang)!, site).href;
+const alternates = (["en", "ro"] as Lang[]).flatMap((l) => (pathIn(l) ? [{ l, href: new URL(pathIn(l)!, site).href }] : []));
+const otherHref = pathIn(other) ?? routes[other].home;
+const nav = [
+  { id: "guide", href: r.guide, label: s.nav.guide },
+  { id: "download", href: r.download, label: s.nav.download },
+] as const;
+const ogImage = new URL(`/og-${lang}.png`, site).href;
+---
+<!doctype html>
+<html lang={lang}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  {canonical && <link rel="canonical" href={canonical} />}
+  {noindex && <meta name="robots" content="noindex" />}
+  {alternates.length > 1 && alternates.map(({ l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
+  {alternates.length > 1 && <link rel="alternate" hreflang="x-default" href={alternates[0].href} />}
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F4F5F9" media="(prefers-color-scheme: light)" />
+  <!-- Before the first paint: the theme picked earlier, so the page never flashes the other one. -->
+  <script is:inline>
+    try {
+      const saved = localStorage.getItem("zarescope-theme");
+      if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+    } catch {}
+  </script>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Zarescope" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:locale" content={lang === "ro" ? "ro_RO" : "en_GB"} />
+  {canonical && <meta property="og:url" content={canonical} />}
+  <meta property="og:image" content={ogImage} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content={s.ogAlt} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={ogImage} />
+  {markdown && <link rel="alternate" type="text/markdown" href={markdown} />}
+  {ld && <script type="application/ld+json" set:html={ld} />}
+</head>
+<body>
+  <a class="skip" href="#main">{s.skip}</a>
+  <header class="top" id="top" tabindex="-1">
+    <div class="wrap top-inner">
+      <a class="brand" href={r.home} aria-label="Zarescope">
+        <img class="when-light" src="/logo.svg" alt="" width="34" height="34" />
+        <img class="when-dark" src="/logo-dark.svg" alt="" width="34" height="34" />
+        <span>Zarescope</span>
+      </a>
+      <nav aria-label={lang === "ro" ? "Principal" : "Main"}>
+        <ul>
+          {nav.map((n) => (
+            <li><a href={n.href} aria-current={n.id === page ? "page" : undefined}>{n.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+      <div class="tools">
+        <a class="ctl" href={repoUrl} aria-label={s.nav.githubLabel} title={s.nav.githubLabel}><Icon name="github" /></a>
+        <button type="button" class="ctl theme" data-theme-toggle hidden aria-pressed="false"
+                aria-label={s.theme.label} data-to-dark={s.theme.toDark} data-to-light={s.theme.toLight}>
+          <Icon name="moon" class="when-light" />
+          <Icon name="sun" class="when-dark" />
+        </button>
+        <a class="ctl lang" href={otherHref} hreflang={other} lang={other}>{s.otherLang}</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <slot />
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <div class="foot-brand">
+        <a class="brand" href={r.home}>
+          <img class="when-light" src="/logo.svg" alt="" width="30" height="30" loading="lazy" />
+          <img class="when-dark" src="/logo-dark.svg" alt="" width="30" height="30" loading="lazy" />
+          <span>Zarescope</span>
+        </a>
+        <p>{s.footer.tagline}</p>
+        <p class="faint">{s.footer.receiveOnly}</p>
+      </div>
+      <ul class="foot-links">
+        <li><a href={r.download}>{s.nav.download}</a></li>
+        <li><a href={r.guide}>{s.nav.guide}</a></li>
+        <li><a href={r.privacy}>{s.footer.privacy}</a></li>
+        <li><a class="with-mark" href={repoUrl}><Icon name="github" size={15} />{s.nav.github}</a></li>
+        <li><a href={issuesUrl}>{s.footer.issues}</a></li>
+        <li><a href={otherHref} hreflang={other} lang={other}>{s.otherLang}</a></li>
+      </ul>
+      <div class="foot-small">
+        <p>{s.footer.noTracking}</p>
+        <p>{s.footer.copyright(copyrightYears)}</p>
+      </div>
+    </div>
+  </footer>
+
+  <a class="to-top" href="#top" data-to-top hidden aria-label={s.toTop} title={s.toTop}><Icon name="arrow-up" /></a>
+  <script>
+    // The theme button flips dark and light and remembers the choice in this
+    // browser. Until it's used, the site follows the system theme, live.
+    const root = document.documentElement;
+    const systemDark = matchMedia("(prefers-color-scheme: dark)");
+    const isDark = () => (root.dataset.theme ? root.dataset.theme === "dark" : systemDark.matches);
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")];
+    const sync = () => {
+      const dark = isDark();
+      for (const b of buttons) {
+        b.setAttribute("aria-pressed", String(dark));
+        b.title = (dark ? b.dataset.toLight : b.dataset.toDark) ?? "";
+      }
+      for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+        m.content = dark ? "#080B14" : "#F4F5F9";
+      }
+    };
+    for (const b of buttons) {
+      b.hidden = false;
+      b.addEventListener("click", () => {
+        const next = isDark() ? "light" : "dark";
+        root.dataset.theme = next;
+        try { localStorage.setItem("zarescope-theme", next); } catch {}
+        sync();
+      });
+    }
+    systemDark.addEventListener("change", sync);
+    sync();
+
+    // Back to top: shown after a screen and a half of scrolling.
+    const toTop = document.querySelector<HTMLAnchorElement>("[data-to-top]");
+    if (toTop) {
+      toTop.hidden = false;
+      const update = () => toTop.classList.toggle("shown", window.scrollY > window.innerHeight * 1.5);
+      window.addEventListener("scroll", update, { passive: true });
+      update();
+      toTop.addEventListener("click", (event) => {
+        event.preventDefault();
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+        document.getElementById("top")?.focus({ preventScroll: true });
+      });
+    }
+  </script>
+</body>
+</html>
+
+<style>
+  .top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: saturate(1.2) blur(10px); border-bottom: 1px solid var(--border); }
+  .top-inner { display: flex; align-items: center; gap: var(--s4) var(--s6); min-height: var(--top-h); }
+  .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; font-weight: 650; font-size: 20px; letter-spacing: -0.015em; }
+  .brand img { width: 34px; height: 34px; flex: none; }
+  .top .brand { margin-right: auto; }
+  nav ul { display: flex; align-items: center; gap: var(--s5); list-style: none; padding: 0; }
+  nav a { color: var(--text-2); text-decoration: none; font-size: 16px; font-weight: 500; padding: 6px 0; transition: color var(--fast) var(--ease); }
+  nav a:hover, nav a[aria-current="page"] { color: var(--text); }
+  nav a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
+  .tools { display: flex; align-items: center; gap: var(--s2); }
+  .ctl {
+    display: inline-flex; align-items: center; justify-content: center; height: 36px; min-width: 36px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius); background: transparent;
+    color: var(--text-2); text-decoration: none; font: 500 15px/1 var(--sans); cursor: pointer;
+    transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease);
+  }
+  .ctl:hover { background: var(--hover); color: var(--text); }
+  .ctl[hidden] { display: none; }
+  .lang { padding: 0 12px; }
+  @media (max-width: 760px) {
+    .top-inner { flex-wrap: wrap; padding-block: 10px 6px; gap: 6px var(--s3); min-height: 0; }
+    nav { order: 3; width: 100%; }
+    nav a { font-size: 15px; }
+  }
+  .foot { margin-top: var(--s9); border-top: 1px solid var(--border); background: var(--surface); padding-bottom: 56px; }
+  .foot-inner { display: grid; grid-template-columns: 1fr auto; gap: var(--s5) var(--s7); padding-block: var(--s7); }
+  .foot .brand { font-size: 18px; gap: 10px; }
+  .foot .brand img { width: 30px; height: 30px; }
+  .foot-brand p { color: var(--text-2); font-size: 15px; margin-top: var(--s3); }
+  .foot-brand .faint { color: var(--text-3); margin-top: var(--s2); }
+  .foot-links { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, auto); gap: var(--s2) var(--s7); align-content: start; }
+  .foot-links a { color: var(--text-2); text-decoration: none; font-size: 15px; }
+  .foot-links a:hover { color: var(--text); text-decoration: underline; }
+  .with-mark { display: inline-flex; align-items: center; gap: 7px; }
+  .foot-small { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s2) var(--s5); border-top: 1px solid var(--border); padding-top: var(--s4); font-size: 13px; color: var(--text-3); }
+  @media (max-width: 640px) { .foot-inner { grid-template-columns: 1fr; } }
+  .to-top {
+    position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 9;
+    display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text-2);
+    opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden;
+    transition: opacity var(--normal) var(--ease), transform var(--normal) var(--ease), visibility 0s linear var(--normal);
+  }
+  .to-top[hidden] { display: none; }
+  .to-top.shown { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition-delay: 0s; }
+  .to-top:hover { background: var(--hover); color: var(--text); }
+  .top:focus { outline: none; }
+</style>

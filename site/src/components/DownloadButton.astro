@@ -1,0 +1,25 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The one primary action. On a computer it downloads this version's disk image
+// from its GitHub release. On a touch-only screen (a phone or tablet) it goes to
+// the download page's note for phones instead, so nobody downloads a Mac app they
+// can't open. Both are plain links; CSS picks one, so it works without JavaScript.
+import Icon from "./Icon.astro";
+import { dmgUrl } from "../data/site";
+import { routes, t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang);
+---
+<a class="btn btn-primary on-mac" href={dmgUrl}><Icon name="download" />{s.download}</a>
+<a class="btn btn-primary on-touch" href={routes[lang].download + "#mac"}>{s.downloadOnMac}<Icon name="arrow-right" /></a>
+
+<style>
+  .on-touch { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .on-mac { display: none; }
+    .on-touch { display: inline-flex; }
+  }
+</style>

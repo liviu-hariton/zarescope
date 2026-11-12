@@ -56,6 +56,8 @@ For satellite images, install SatDump separately (`brew install --cask satdump`)
 
 Recordings are saved to `~/Library/Application Support/Zarescope/recordings/` as `.cu8` plus a JSON sidecar ([docs/FORMATS.md](docs/FORMATS.md)).
 
+**Website:** https://zarescope.eu, built from `site/` (Astro). See [docs/RELEASE.md](docs/RELEASE.md#the-website) for previewing, screenshots and deploying.
+
 **A copy for another Mac:** `tools/package.sh` builds, signs (ad hoc) and checks a Release `Zarescope.app` and packs it as a `.zip` and a `.dmg` in `build-release/dist/`; [docs/RELEASE.md](docs/RELEASE.md) explains how to open it there the first time.
 
 The user guide is in the app (Help tab, ⌘?) and in [resources/help](resources/help/guide.en.md). Every command is in the macOS menu bar with its shortcut; `--print-menus` prints the structure.

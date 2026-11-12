@@ -1,0 +1,24 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Privacy: what the site and the app collect (nothing about you).
+import Base from "../layouts/Base.astro";
+import { t, type Lang } from "../i18n/ui";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const p = t(lang).privacyPage;
+---
+<Base lang={lang} page="privacy" title={p.title} description={p.description}>
+  <div class="wrap page">
+    <h1 class="page-title">{p.title}</h1>
+    <p class="lede">{p.description}</p>
+    <dl class="rows">{p.sections.map(([k, v]) => <div class="row"><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+  </div>
+</Base>
+
+<style>
+  .lede { color: var(--text-2); font-size: 20px; margin: var(--s4) 0 var(--s7); max-width: 36em; }
+  .rows { max-width: 900px; }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--text-2); }
+</style>
