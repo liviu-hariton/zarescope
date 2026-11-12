@@ -14,7 +14,8 @@
 # closed: a Zarescope you have open yourself is left alone.
 #
 # Needs: cmake --build build (the app and zarescope-synth). The app's windows
-# open in front for a few seconds each; leave the Mac alone meanwhile.
+# open in front for a few seconds each; leave the Mac alone meanwhile (the
+# pointer is moved to the menu bar before each shot, so it can't hover).
 #
 # Usage: tools/capture-site-images.sh
 set -euo pipefail
@@ -47,6 +48,14 @@ print(best.0)
 SWIFT
 swiftc -O -o "$WORK/winid" "$WORK/winid.swift"
 
+# Parks the pointer in the menu bar, away from the app's window, so no hover
+# effect or tooltip (the waterfall's "Click to listen here") gets captured.
+cat > "$WORK/park.swift" <<'SWIFT'
+import CoreGraphics
+CGWarpMouseCursorPosition(CGPoint(x: 400, y: 4))
+SWIFT
+swiftc -O -o "$WORK/park" "$WORK/park.swift"
+
 "$SYNTH" "$WORK/fm.cu8" 20 >/dev/null
 "$SYNTH" "$WORK/adsb.cu8" 30 --adsb --station "$STATION" >/dev/null
 
@@ -54,6 +63,7 @@ USER_TLE="$HOME/Library/Application Support/Zarescope/tle_cache"
 
 capture() {  # capture <home> <file> <app arguments…>; WAIT=seconds before the shot (7)
     local home="$1" file="$2"; shift 2
+    "$WORK/park"
     ZARESCOPE_HOME="$home" "$APP" "$@" >/dev/null 2>&1 &
     local pid=$!
     CURRENT_PID=$pid
