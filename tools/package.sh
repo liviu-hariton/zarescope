@@ -51,6 +51,11 @@ step "Stripping local symbols"
 strip -x "$exe"
 
 step "Signing ad hoc, with the hardened runtime"
+# Extended attributes from this machine (quarantine tags naming the app a
+# file was downloaded with, Finder info) don't belong in the bundle; the
+# signature doesn't use them. macOS keeps com.apple.provenance, which the
+# zip and the disk image leave out below.
+xattr -cr "$app" 2>/dev/null || true
 # The bundle is signed as a whole, so its resources (tokens, fonts,
 # catalog) are sealed too: a changed file makes the signature fail.
 codesign --force --sign - --options runtime --timestamp=none \
@@ -84,16 +89,22 @@ dist="$build/dist"
 rm -rf "$dist"
 mkdir -p "$dist"
 name="Zarescope-$version-arm64"
-# ditto keeps the signature and extended attributes intact (plain zip doesn't).
-ditto -c -k --keepParent "$app" "$dist/$name.zip"
+# ditto keeps the bundle's structure and signature intact (plain zip doesn't);
+# no extended attributes or resource forks go in (the signature is in the files).
+ditto -c -k --norsrc --noextattr --keepParent "$app" "$dist/$name.zip"
 # A disk image with the app and a link to /Applications, to drag it across.
 stage="$dist/stage"
 mkdir -p "$stage"
-ditto "$app" "$stage/Zarescope.app"
+ditto --norsrc --noextattr "$app" "$stage/Zarescope.app"
 ln -s /Applications "$stage/Applications"
 hdiutil create -quiet -volname "Zarescope $version" -srcfolder "$stage" -format UDZO \
     -ov "$dist/$name.dmg"
 rm -rf "$stage"
+
+# Nothing from this machine travels in the zip: no AppleDouble (._) entries.
+if unzip -Z1 "$dist/$name.zip" | grep -q '/\._'; then
+    echo "The zip carries extended attributes (._ files)" >&2; exit 1
+fi
 
 step "Done"
 ls -lh "$dist"
