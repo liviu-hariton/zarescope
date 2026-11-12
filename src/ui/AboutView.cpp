@@ -85,6 +85,20 @@ AboutView::Actions AboutView::draw(UiKit& ui, const AboutInfo& info) {
     y += ui.spacing("4");
     centred(TypeRole::Body, ui.trf(StringId::AboutVersion, info.version), "text/secondary");
     centred(TypeRole::MonoSmall, info.build, "text/secondary");
+    if (!info.updateVersion.empty()) {
+        // The update check found a newer one: said in words, in the accent.
+        y += ui.spacing("8");
+        centred(TypeRole::Body, ui.trf(StringId::AboutUpdateAvailable, info.updateVersion),
+                "accent");
+        y += ui.spacing("8");
+        const std::string_view download = ui.tr(StringId::UpdatesDownload);
+        const float downloadW = ui.buttonWidth(download);
+        if (ui.button("##aboutDownload", ImVec2(centre - downloadW * 0.5F, y), download,
+                      ButtonKind::Secondary)) {
+            actions.openDownload = true;
+        }
+        y += ui.size("control");
+    }
     y += ui.spacing("16");
     centred(TypeRole::Body, ui.tr(StringId::AboutTagline), "text/primary");
     y += ui.spacing("12");

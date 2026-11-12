@@ -63,6 +63,7 @@ enum class Command : int {
     HelpShortcuts,
     Website,
     SourceCode,
+    CheckUpdates,
     ReportProblem,
     PresetFirst = 1000,  // + the preset's index in presets.json
 };

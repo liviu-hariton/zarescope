@@ -6,8 +6,10 @@
 
 #include "app/PassAutomation.h"
 #include "app/Settings.h"
+#include "app/UpdateCheck.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
+#include "net/HttpGet.h"
 #include "platform/AppMenu.h"
 #include "platform/AppPaths.h"
 #include "platform/Desktop.h"
@@ -193,6 +195,8 @@ struct App::State {
     // so whatever the window saved on its way out is still written.
     std::unique_ptr<SettingsStore> settingsStore;
     std::unique_ptr<store::JournalService> journal;
+    // The update check's worker; the window only reads its status.
+    std::unique_ptr<UpdateChecker> updates;
     // Answers "use my current location"; goes before the window, whose
     // callback it may still call (with "cancelled").
     std::unique_ptr<platform::LocationFinder> locationFinder;
@@ -226,6 +230,7 @@ struct App::State {
         // The window's views unregister their textures: needs the context.
         mainWindow.reset();
         satellites.reset();  // joins its worker (a download in flight ends within its timeout)
+        updates.reset();     // the same
         if (implotContext) {
             ImPlot::DestroyContext();
         }
@@ -317,6 +322,29 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
     }
     s.journal = std::make_unique<store::JournalService>(dataRoot / "journal.sqlite");
 
+    // Every request names the app and its version, and nothing else.
+    const std::string userAgent =
+        std::string("Zarescope/") + ZARESCOPE_VERSION + " (+https://zarescope.eu)";
+    // The update check (off unless turned on). ZARESCOPE_UPDATE_URL points it
+    // at another file, a file:// one included, to try it out.
+    {
+        UpdateChecker::Options updates;
+        updates.currentVersion = ZARESCOPE_VERSION;
+        bool allowFile = false;
+        if (const char* url = std::getenv("ZARESCOPE_UPDATE_URL");
+            url != nullptr && url[0] != '\0') {
+            updates.url = url;
+            allowFile = true;
+        }
+        updates.automatic = settings.checkUpdates;
+        updates.lastChecked = settings.updateCheckedUtc;
+        updates.latestVersion = settings.latestVersion;
+        updates.fetch = [userAgent, allowFile](const std::string& url, std::string& error) {
+            return net::httpGet(url, userAgent, kMaxLatestBytes, error, allowFile);
+        };
+        s.updates = std::make_unique<UpdateChecker>(std::move(updates));
+    }
+
     s.shell.variant = options.variant.value_or(settings.theme == "light"
                                                    ? theme::ThemeVariant::Light
                                                    : theme::ThemeVariant::Dark);
@@ -371,9 +399,8 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
                      : waiting ? platform::KeepAwake::Level::Waiting
                                : platform::KeepAwake::Level::Normal);
         };
-        s.satellites = std::make_unique<sat::SatelliteService>(
-            std::move(*catalog), dataRoot / "tle_cache",
-            std::string("Zarescope/") + ZARESCOPE_VERSION + " (+https://zarescope.eu)");
+        s.satellites = std::make_unique<sat::SatelliteService>(std::move(*catalog),
+                                                               dataRoot / "tle_cache", userAgent);
         services.satellites = s.satellites.get();
     } else {
         std::fprintf(stderr, "%s\n", error.c_str());
@@ -387,6 +414,7 @@ App::App(const Options& options) : m_state(std::make_unique<State>()) {
         store.save(changed);
     };
     services.journal = s.journal.get();
+    services.updates = s.updates.get();
     services.dataFolder = dataRoot;
     services.saveAutoRecord = !options.simulatePassSeconds.has_value();
     services.chooseExportFile = [](const std::string& name) {

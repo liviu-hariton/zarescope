@@ -40,7 +40,8 @@ std::vector<MenuSpec> buildMenus(Language language, const std::vector<std::strin
 
     menus.push_back({"Zarescope",
                      "app",
-                     {command(StringId::MenuAbout, Command::About), separator(),
+                     {command(StringId::MenuAbout, Command::About),
+                      command(StringId::MenuCheckUpdates, Command::CheckUpdates), separator(),
                       command(StringId::MenuSettings, Command::Settings, ","), separator(),
                       role(StringId::MenuHide, "hide", "h"),
                       role(StringId::MenuHideOthers, "hideOthers", "h", true),

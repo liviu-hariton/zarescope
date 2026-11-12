@@ -25,12 +25,15 @@ struct AboutInfo {
     std::string version;         // "0.9.0"
     std::string build;           // "macOS 15.1 · arm64 · Dear ImGui 1.93.0"
     std::string copyrightYears;  // "2026", or "2026–2028"
+    // A newer version the update check found ("" when there is none).
+    std::string updateVersion;
 };
 
 class AboutView {
 public:
     struct Actions {
         bool openWebsite = false;
+        bool openDownload = false;
     };
 
     void open() { m_openRequested = true; }

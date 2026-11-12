@@ -203,7 +203,7 @@ From top to bottom:
 ## 11. Menu bar, Help and About (added 2026-11-12)
 
 - **Menu bar (macOS):** native, at the top of the screen like any Mac app's, so every command and its shortcut can be found there.
-  - **Zarescope:** About, Settings… ⌘,, Hide, Hide Others, Show All, Quit ⌘Q.
+  - **Zarescope:** About, Check for Updates…, Settings… ⌘,, Hide, Hide Others, Show All, Quit ⌘Q.
   - **File:** Connect Receiver… ⇧⌘K, Open Recording… ⌘O, Start/Stop Recording ⇧⌘R, Close Receiver/Recording, Export Journal as CSV… / JSON…, Close Window ⌘W.
   - **Edit:** Undo, Redo, Cut, Copy, Paste, Select All, for the text fields.
   - **View:** the six tabs ⌘1–⌘6 (the current one checked), Bigger / Smaller / Standard Text ⌘+ ⌘- ⌘0, Dark / Light Theme, Enter Full Screen ⌃⌘F.
@@ -223,4 +223,11 @@ From top to bottom:
   - "Project page" and "Copy version info" (which confirms with "Copied" and a check).
   - Under a hairline, the licence, the credits and "© 2026 Liviu Hariton and contributors" in caption-size faint text, each wrapped line centred on its own. The copyright becomes a range, such as "2026–2028", from the build year.
   - A primary Close button.
+
+## 12. Update check (added 2026-11-12)
+
+- **Status bar pill:** when a newer version is known, a pill follows the version in the status bar: accent text on accent/soft, a 1-px accent border, pill radius, inset 4 px from the bar's edges, in the bar's mono/small type. It says "Version 0.11.0 available" in words, so the colour is never the only signal. A click opens the download page; hover uses bg/hover and the hand cursor; a tooltip explains it.
+- **Banner:** only for a check the user asked for. While it runs: neutral, "Checking…". Then: success with a check for "You have the latest version"; neutral with Download (right) and Dismiss for a newer version; warning with its icon for a failure, naming the reason. Automatic checks never show a banner.
+- **Settings › Updates** (the last section): the daily-check checkbox, one secondary sentence on what is sent, then the state (the newer version in accent, or when the last check ran), then the actions: Download first when there is something to download, then Check now ("Checking…" and disabled while one runs).
+- **About:** under the build line, "Version 0.11.0 is available." in accent, and a secondary Download button on its own row (the 400-px column can't hold three buttons in Romanian).
 

@@ -2,6 +2,8 @@
 
 #include "app/Settings.h"
 
+#include "app/UpdateCheck.h"      // version numbers
+#include "device/IqMetadata.h"    // UTC timestamps
 #include "device/RtlSdrSource.h"  // the sample rates a stick accepts
 
 #include <nlohmann/json.hpp>
@@ -91,6 +93,18 @@ Settings parseSettings(std::string_view text, std::string& warning) {
     settings.ppm = std::clamp(settings.ppm, -200, 200);
     read(json, "dataFolder", settings.dataFolder, warning);
     read(json, "discoverySeen", settings.discoverySeen, warning);
+    read(json, "checkUpdates", settings.checkUpdates, warning);
+    std::string checked;
+    read(json, "updateCheckedUtc", checked, warning);
+    if (!checked.empty()) {
+        settings.updateCheckedUtc = device::parseUtcTimestamp(checked);
+    }
+    read(json, "latestVersion", settings.latestVersion, warning);
+    if (const auto version = parseVersion(settings.latestVersion)) {
+        settings.latestVersion = formatVersion(*version);
+    } else {
+        settings.latestVersion.clear();
+    }
     return settings;
 }
 
@@ -114,6 +128,11 @@ std::string settingsToJson(const Settings& settings) {
     json["ppm"] = settings.ppm;
     json["dataFolder"] = settings.dataFolder;
     json["discoverySeen"] = settings.discoverySeen;
+    json["checkUpdates"] = settings.checkUpdates;
+    json["updateCheckedUtc"] = settings.updateCheckedUtc
+                                   ? device::formatUtcTimestamp(*settings.updateCheckedUtc)
+                                   : std::string{};
+    json["latestVersion"] = settings.latestVersion;
     return json.dump(2) + "\n";
 }
 

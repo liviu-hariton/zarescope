@@ -40,13 +40,14 @@ These rules hold:
 |---|---|---|
 | `zarescope_dsp` | `SpscSlots`, `TripleBuffer`, `blackmanHarris`, `FftEngine` (KissFFT), `SpectrumAnalyzer`, the filters, `AudioDemodulator`, `SignalGenerator`, cu8 conversion | KissFFT |
 | `zarescope_adsb` | `ModeS`, `Cpr`, `ModeSDemodulator`, `AircraftStore`, `Encoder` | `zarescope_dsp` |
-| `zarescope_sat` | `SatCatalog`, `Orbit` (TLE, propagator, passes), `SatelliteService`, `PassScheduler` | sgp4, libcurl (system), nlohmann/json, `zarescope_device` (timestamps) |
+| `zarescope_net` | `httpGet`: one small HTTPS download, size-capped, HTTPS-only redirects | libcurl (system) |
+| `zarescope_sat` | `SatCatalog`, `Orbit` (TLE, propagator, passes), `SatelliteService`, `PassScheduler` | sgp4, `zarescope_net`, nlohmann/json, `zarescope_device` (timestamps) |
 | `zarescope_audio` | `AudioOutput`, `AudioRing` | miniaudio |
 | `zarescope_device` | `SampleSource`, `RtlSdrSource`, `FileSource`, `IqMetadata`, `IqRecorder`, `DeviceIdentity`, `Presets`, `Receiver` | `zarescope_dsp`, `zarescope_audio`, librtlsdr (static), libusb (static), nlohmann/json |
 | `zarescope_os` | `runProcess` (POSIX), where external tools live (macOS) | — |
 | `zarescope_integrations` | `SatDumpRunner` | `zarescope_os`, `zarescope_device`, nlohmann/json |
 | `zarescope_store` | `Journal`, `JournalService` | SQLite (system), nlohmann/json, `zarescope_device` (timestamps) |
-| `zarescope_appcore` | `PassAutomation`, `Settings` (`src/app`) | `zarescope_device`, `zarescope_sat`, `zarescope_integrations` |
+| `zarescope_appcore` | `PassAutomation`, `Settings`, `UpdateChecker` (`src/app`) | `zarescope_device`, `zarescope_sat`, `zarescope_integrations`, `zarescope_net` |
 | `zarescope_theme` | `DesignTokens` | nlohmann/json |
 | `zarescope_ui` | the screens, the ImGui and ImPlot themes, fonts, strings, formats | `zarescope_theme`, `zarescope_device`, Dear ImGui, ImPlot |
 | `zarescope_platform` | Metal renderer, macOS paths, window appearance, file dialog, notifications, Finder and keep-awake | Dear ImGui's Metal backend, Cocoa, UniformTypeIdentifiers |
@@ -140,7 +141,7 @@ Settings travel from the UI to the DSP through a `TripleBuffer`. Offset, volume 
   - `passTrack` gives the polar plot's points.
 - **SatelliteService.** It has its own worker thread, and the UI reads a mutex-guarded snapshot.
   - **Start-up.** It loads the cache.
-  - **Downloads.** It fetches stale TLEs (older than 12 h) through libcurl, HTTPS only, with answers capped at 16 KiB.
+  - **Downloads.** It fetches stale TLEs (older than 12 h) through `net::httpGet` (libcurl), HTTPS only, with answers capped at 16 KiB.
   - **Predictions.** It predicts 48 h of passes when its inputs change, and every 10 minutes.
 - **Notifications.** `MainWindow` announces each pass five minutes before AOS through `platform::notify`.
 
@@ -216,6 +217,13 @@ PassAutomation::update(now, passes)
 - **Help and About.** The user guide is Markdown (`resources/help/guide.en.md`, `guide.ro.md`), read once at start-up and parsed by `ui::Guide` (a small subset that still reads well on GitHub: headings, paragraphs, bullets, numbered steps and two-column tables; `**bold**` and `` `code` `` marks are dropped). `HelpView` draws it with an "On this page" rail. About is a modal with the version, the system and the copyright years. A test keeps the two guides' sections in step.
 - **Location.** `platform::LocationFinder` asks Core Location once for "Use my current location" and calls back exactly once: a position, or why there isn't one (permission denied, Location Services off, or no fix). The hardened runtime needs the `personal-information.location` entitlement for it, and `Info.plist` carries the usage text.
 - **Notifications, file dialogs, opening links, keeping awake during a pass**: small functions behind `platform/` headers, each with its macOS implementation here.
+
+## The update check (`src/app/UpdateCheck`)
+
+- **Off unless asked.** Settings › Updates turns on a daily check; Zarescope › Check for Updates… (and Check now in Settings) asks at once.
+- **What it asks.** A GET of `https://zarescope.eu/latest.json` (`{"version":"0.11.0"}`, written by the site build) through `net::httpGet`, with the User-Agent CelesTrak also sees, reading at most 4 KB. It compares the three numbers with this version. Nothing is downloaded or installed, and the download page it links to is fixed in the app, never taken from the answer.
+- **Timing.** `UpdateChecker` runs on its own worker thread. Automatic checks wait 10 s after start-up, then run once a day when one gets through; a failed one is tried again an hour later, silently. The worker takes the download as a function, so the tests give it a fake site.
+- **What the UI shows.** `MainWindow` reads the status every frame and keeps the last good check and the newest version in `settings.json`, so the next run knows them before asking. A newer version lights a pill in the status bar (to the download page) and a line with a Download button in About. A check the user asked for shows a banner while it runs and then its outcome: up to date, available, or why it failed. `ZARESCOPE_UPDATE_URL` points the check at another file (`file://` works) to try this out.
 
 ## Start-up and frame loop
 

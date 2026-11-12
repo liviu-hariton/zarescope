@@ -76,11 +76,12 @@ find src tests -name '*.cpp' -o -name '*.h' -o -name '*.mm' | xargs xcrun clang-
 ## Project layout
 
 ```
-src/app/            main(), the frame loop, settings, pass automation
+src/app/            main(), the frame loop, settings, pass automation, update check
 src/device/         sample sources (stick, file), the receiver pipeline, IQ recorder, device arbiter
 src/dsp/            FFT, spectrum analyser, audio chain, lock-free queues
 src/decoders/adsb/  Mode S / ADS-B: CRC, CPR, demodulator, aircraft store
 src/audio/          sound output (miniaudio)
+src/net/            small HTTPS downloads (orbits, the update check)
 src/sat/            satellite catalog, TLEs, SGP4, pass prediction, pass scheduler
 src/integrations/   SatDump, run as a separate process
 src/store/          the journal (SQLite)

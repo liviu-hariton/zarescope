@@ -5,12 +5,14 @@
 #
 #   zarescope_dsp       FFT, spectrum, queues    → KissFFT
 #   zarescope_adsb      Mode S / ADS-B decoder   → zarescope_dsp
-#   zarescope_sat       catalog, TLE, SGP4, passes, pass scheduler → sgp4
+#   zarescope_net       small HTTPS downloads    → libcurl (system)
+#   zarescope_sat       catalog, TLE, SGP4, passes, pass scheduler → sgp4, zarescope_net
 #   zarescope_os        running external programs (POSIX), tool locations
 #   zarescope_integrations  SatDump runner     → zarescope_os
 #   zarescope_store     the journal (SQLite)     → SQLite (system)
-#   zarescope_appcore   pass automation, settings → zarescope_device, zarescope_sat,
-#                                                  zarescope_integrations
+#   zarescope_appcore   pass automation, settings, update check
+#                                                → zarescope_device, zarescope_sat,
+#                                                  zarescope_integrations, zarescope_net
 #   zarescope_audio     sound output             → miniaudio
 #   zarescope_device    sample sources, IQ files → zarescope_dsp, librtlsdr
 #   zarescope_theme     design tokens            → nlohmann/json
@@ -61,6 +63,13 @@ target_include_directories(zarescope_adsb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(zarescope_adsb PUBLIC zarescope_dsp)
 zarescope_set_warnings(zarescope_adsb)
 
+# The few small HTTPS downloads (orbits, the version file), through libcurl.
+add_library(zarescope_net STATIC
+    net/HttpGet.cpp)
+target_include_directories(zarescope_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zarescope_net PRIVATE CURL::libcurl)
+zarescope_set_warnings(zarescope_net)
+
 add_library(zarescope_sat STATIC
     sat/Orbit.cpp
     sat/PassScheduler.cpp
@@ -69,7 +78,7 @@ add_library(zarescope_sat STATIC
 target_include_directories(zarescope_sat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(zarescope_sat
     PUBLIC zarescope_device
-    PRIVATE zs_sgp4 nlohmann_json::nlohmann_json CURL::libcurl)
+    PRIVATE zs_sgp4 nlohmann_json::nlohmann_json zarescope_net)
 zarescope_set_warnings(zarescope_sat)
 
 # Plain C++ against POSIX and the OS's tool locations: no UI, so the tests
@@ -99,11 +108,12 @@ zarescope_set_warnings(zarescope_store)
 
 add_library(zarescope_appcore STATIC
     app/PassAutomation.cpp
-    app/Settings.cpp)
+    app/Settings.cpp
+    app/UpdateCheck.cpp)
 target_include_directories(zarescope_appcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(zarescope_appcore
     PUBLIC zarescope_device zarescope_sat zarescope_integrations
-    PRIVATE nlohmann_json::nlohmann_json)
+    PRIVATE nlohmann_json::nlohmann_json zarescope_net)
 zarescope_set_warnings(zarescope_appcore)
 
 add_library(zarescope_theme STATIC

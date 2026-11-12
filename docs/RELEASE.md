@@ -68,7 +68,7 @@ Decided on 2026-11-12: not now. When it is wanted, the steps are:
 2. `tools/publish-release.sh` tags `v<version>` and creates the GitHub release with both files and their SHA-256 (needs the GitHub CLI, signed in: `gh auth login`).
 3. `tools/deploy-site.sh` rebuilds the website, so its Download button names the new version, and copies it to zarescope.eu.
 
-Keep this order. The site takes its version from `CMakeLists.txt`, so deploying it before the release exists makes every Download button point to a file that isn't there yet.
+Keep this order. The site takes its version from `CMakeLists.txt`, so deploying it before the release exists makes every Download button point to a file that isn't there yet. The same deploy updates `/latest.json`, which the app's update check reads: deployed too early, it would tell people about a version they can't download yet.
 
 **Replacing a release's files** (a rebuilt package, same version): `gh release upload v<version> <dmg> <zip> --clobber`, then put the new SHA-256 values in the release notes (`gh release edit v<version> --notes-file …`). The site's links stay the same, so it needs no redeploy.
 

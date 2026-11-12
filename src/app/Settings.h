@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <filesystem>
@@ -46,6 +47,11 @@ struct Settings {
     int ppm = 0;                              // frequency correction for the stick
     std::string dataFolder;  // empty = the default (Application Support/Zarescope)
     bool discoverySeen = false;  // the first run opens on Discovery
+    // The update check (UpdateCheck.h): off unless turned on; when a check
+    // last got through, and the newest version it announced ("" if none).
+    bool checkUpdates = false;
+    std::optional<std::chrono::system_clock::time_point> updateCheckedUtc;
+    std::string latestVersion;
     bool operator==(const Settings&) const = default;
 };
 

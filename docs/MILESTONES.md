@@ -249,3 +249,5 @@ Additions asked for after the milestones, still v1 scope.
 - [x] **About window (0.10.0).** Version and build line (copyable for bug reports), the receive-only note, the project page, licence and credits.
 - [x] **Website.** https://zarescope.eu, built from `site/` (Astro, EN and RO), with the app's screenshots, the user guide, the download page and a privacy page. docs/RELEASE.md, "The website".
 - [x] **First public release.** v0.10.0 on GitHub, with the `.dmg`, the `.zip` and their SHA-256.
+- [x] **Update check (next release, 0.11.0).** Off by default: Settings › Updates turns on a daily check of `zarescope.eu/latest.json`, and Zarescope › Check for Updates… asks at once. A newer version shows as a pill in the status bar and a line in About, linking to the download page; nothing is installed. DECISIONS.md, 2026-11-12.
+- [x] **The status bar shows in full.** The body area left out the 8-px gap before the status bar, so the bar's bottom 8 px fell below the window's edge.

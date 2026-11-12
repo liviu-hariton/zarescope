@@ -326,6 +326,22 @@ enum class StringId {
     StatusNoReceiver,
     StatusReplaying,
     StatusDropped,
+    // The update check
+    MenuCheckUpdates,
+    UpdatesLabel,
+    UpdatesAutomatic,
+    UpdatesPrivacy,
+    UpdatesCheckNow,
+    UpdatesChecking,
+    UpdatesLastChecked,
+    UpdatesNeverChecked,
+    UpdatesUpToDate,
+    UpdatesAvailable,
+    UpdatesFailed,
+    UpdatesDownload,
+    StatusUpdate,
+    TipStatusUpdate,
+    AboutUpdateAvailable,
     Count  // keep last
 };
 

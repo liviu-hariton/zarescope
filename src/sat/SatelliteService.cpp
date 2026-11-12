@@ -3,8 +3,8 @@
 #include "sat/SatelliteService.h"
 
 #include "device/IqMetadata.h"  // UTC timestamp format
+#include "net/HttpGet.h"
 
-#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -16,50 +16,7 @@ namespace zarescope::sat {
 namespace {
 
 constexpr auto kPredictEvery = std::chrono::minutes(10);
-constexpr long kTimeoutSeconds = 20;
 constexpr size_t kMaxResponseBytes = 16 * 1024;  // a TLE is under 200 bytes
-
-size_t collect(char* data, size_t size, size_t count, void* user) {
-    auto* body = static_cast<std::string*>(user);
-    const size_t bytes = size * count;
-    if (body->size() + bytes > kMaxResponseBytes) {
-        return 0;  // refuse oversized answers
-    }
-    body->append(data, bytes);
-    return bytes;
-}
-
-// One GET with libcurl. Returns the body, or std::nullopt with `error`.
-std::optional<std::string> httpGet(const std::string& url, const std::string& userAgent,
-                                   std::string& error) {
-    CURL* curl = curl_easy_init();
-    if (curl == nullptr) {
-        error = "network unavailable";
-        return std::nullopt;
-    }
-    std::string body;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, userAgent.c_str());
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, kTimeoutSeconds);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
-    curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, collect);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
-    const CURLcode result = curl_easy_perform(curl);
-    long status = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
-    curl_easy_cleanup(curl);
-    if (result != CURLE_OK) {
-        error = curl_easy_strerror(result);
-        return std::nullopt;
-    }
-    if (status != 200) {
-        error = "CelesTrak answered HTTP " + std::to_string(status);
-        return std::nullopt;
-    }
-    return body;
-}
 
 }  // namespace
 
@@ -213,7 +170,7 @@ void SatelliteService::fetchStale() {
             "https://celestrak.org/NORAD/elements/gp.php?CATNR=" + std::to_string(sat.noradId) +
             "&FORMAT=TLE";
         std::string error;
-        auto body = httpGet(url, m_userAgent, error);
+        auto body = net::httpGet(url, m_userAgent, kMaxResponseBytes, error);
         std::optional<Tle> tle;
         if (body) {
             tle = parseTle(*body, error);
@@ -224,7 +181,7 @@ void SatelliteService::fetchStale() {
         }
         const std::scoped_lock lock(m_mutex);
         if (!tle) {
-            m_snapshot.lastError = sat.name + ": " + error;
+            m_snapshot.lastError = sat.name + " (CelesTrak): " + error;
             continue;
         }
         const TleInfo info{*tle, Clock::now()};

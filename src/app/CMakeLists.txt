@@ -65,5 +65,6 @@ set_target_properties(Zarescope PROPERTIES
 
 target_compile_definitions(Zarescope PRIVATE ZARESCOPE_VERSION="${PROJECT_VERSION}"
     ZARESCOPE_BUILD_YEAR=${ZARESCOPE_BUILD_YEAR})
-target_link_libraries(Zarescope PRIVATE zarescope_ui zarescope_appcore zarescope_store zarescope_os zarescope_platform)
+target_link_libraries(Zarescope PRIVATE zarescope_ui zarescope_appcore zarescope_store zarescope_net
+    zarescope_os zarescope_platform)
 zarescope_set_warnings(Zarescope)

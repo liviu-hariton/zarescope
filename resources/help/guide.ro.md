@@ -109,6 +109,7 @@ Tabul Jurnal păstrează ce s-a recepționat: fiecare pasaj de satelit și rezul
 | Receptor | Rata de eșantionare cu care se deschide un stick și corecția lui de frecvență. |
 | Dosarul de date | Unde merg înregistrările, imaginile, cache-ul orbitelor și jurnalul. Se aplică după repornirea Zarescope. |
 | Limba | Engleză sau română. |
+| Actualizări | Caută o versiune nouă o dată pe zi: oprită până o pornești. Verifică acum întreabă imediat, la fel ca Zarescope › Caută actualizări…. Zarescope cere de la zarescope.eu doar numărul celei mai noi versiuni; nu se trimite nimic despre tine și nu se descarcă și nu se instalează nimic. Când există o versiune nouă, bara de stare îți spune; un clic pe ea deschide pagina de descărcare. |
 
 Setările se salvează pe măsură ce le schimbi.
 

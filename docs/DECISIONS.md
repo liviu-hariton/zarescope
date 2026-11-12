@@ -406,3 +406,18 @@ Architecture choices and notable trade-offs, newest last. Each entry gives the d
 - **Rejected.**
   - A headline beside a floating screenshot: the category default.
   - Hosted fonts or analytics: no third-party requests (PRODUCT.md).
+
+## 2026-11-12 — An update check that only asks for a version number, and is off by default
+
+- **Decision.** Zarescope can ask `https://zarescope.eu/latest.json` whether a newer version exists.
+  - **Off by default.** The daily check runs only after the user turns it on (Settings › Updates). Check for Updates… in the Zarescope menu, or Check now in Settings, asks at once.
+  - **What it asks.** One HTTPS GET with the app's usual User-Agent (`Zarescope/<version> (+https://zarescope.eu)`), at most 4 KB read, nothing about the user, the station or the receiver.
+  - **What it does with the answer.** It compares the version number, and that is all. A newer one lights a pill in the status bar and a line in About. Both open the download page, whose address is fixed in the app. Nothing is downloaded or installed.
+  - **Timing.** At most once a day when a check gets through, 10 s after start-up at the earliest; a failed automatic check is retried an hour later, silently. A check the user asks for always runs and reports its outcome in a banner.
+  - **The file.** The website build writes it from `CMakeLists.txt`, so it moves with the site, which is deployed after the release exists (docs/RELEASE.md).
+- **Why.** The app isn't in an app store and has no other way to tell people a fix is out. Obdaryn does the same. The privacy page says exactly what is sent.
+- **Rejected.**
+  - The GitHub releases API: a third party sees every check, the answer is large, and it has rate limits.
+  - Sparkle (automatic download and install): it needs a Developer ID-signed, notarized app and an appcast to serve. Too much for an ad-hoc signed app whose users install from a disk image.
+  - On by default: an app that receives must not call home unasked.
+

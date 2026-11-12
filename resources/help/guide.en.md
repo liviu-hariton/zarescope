@@ -109,6 +109,7 @@ The Journal tab keeps what was received: every satellite pass and its outcome, t
 | Receiver | The sample rate a stick opens with, and its frequency correction. |
 | Data folder | Where recordings, images, the orbit cache and the journal go. Takes effect when Zarescope restarts. |
 | Language | English or Romanian. |
+| Updates | Check for a new version once a day: off until you turn it on. Check now asks at once, as does Zarescope › Check for Updates…. Zarescope asks zarescope.eu only for the newest version number; nothing about you is sent, and nothing is downloaded or installed. When a newer version exists, the status bar says so; click it to open the download page. |
 
 Settings are saved as you change them.
 

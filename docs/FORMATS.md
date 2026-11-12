@@ -194,7 +194,10 @@ The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted
   "defaultSampleRateSps": 2400000,
   "ppm": 0,
   "dataFolder": "",
-  "discoverySeen": true
+  "discoverySeen": true,
+  "checkUpdates": false,
+  "updateCheckedUtc": "2026-11-12T14:56:31.000Z",
+  "latestVersion": "0.11.0"
 }
 ```
 
@@ -211,8 +214,21 @@ The baseband recording (in `recordings/`, the usual `.cu8` + sidecar) is deleted
 | `ppm` | frequency correction, −200…200 |
 | `dataFolder` | where recordings, products, the TLE cache and the journal go; empty = Application Support. Applies after a restart. |
 | `discoverySeen` | false on the first run, which opens on Discover |
+| `checkUpdates` | the daily update check is on (off by default) |
+| `updateCheckedUtc` | when an update check last got through, UTC; empty = never |
+| `latestVersion` | the newest version zarescope.eu announced, `x.y.z`; empty = none known |
 
 Unknown keys are ignored; a missing or invalid value keeps its default.
+
+## The version file (served by zarescope.eu)
+
+`https://zarescope.eu/latest.json`, written by the website build (`site/src/pages/latest.json.ts`) from the version in `CMakeLists.txt`, and read by the update check (`src/app/UpdateCheck.h`):
+
+```json
+{"version":"0.11.0"}
+```
+
+Only `version` is read: three numbers, `major.minor.patch`. Other keys are ignored, and an answer over 4 KB is refused. The app never takes an address from this file; its download page is fixed in the app.
 
 ## Journal (written and read)
 

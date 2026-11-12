@@ -14,7 +14,7 @@ Every third-party component, with its version, licence and reason. A new depende
 | [librtlsdr, RTL-SDR Blog fork](https://github.com/rtlsdrblog/rtl-sdr-blog) | V1.4.0 (2026-08) | GPL-2.0-or-later | Access to the RTL-SDR stick; this release recognises the Blog V4 (R828D) and V4 Lite (R828S) | FetchContent, the library and tuner sources built as static `zs_rtlsdr` (no pkg-config needed) |
 | [miniaudio](https://miniaud.io) | 0.11.26 | Public domain (Unlicense) or MIT-0 | Sound output on every platform (CoreAudio on macOS) | FetchContent, `miniaudio.c` built as `zs_miniaudio`, playback only, system frameworks linked directly |
 | [sgp4](https://github.com/dnwrnr/sgp4) | 3.0 (2026-09) | Apache-2.0 | SGP4/SDP4 orbit propagation from TLEs (Vallado 2006) | FetchContent, `libsgp4/*.cpp` built as `zs_sgp4` |
-| [libcurl](https://curl.se) | the system's (macOS SDK) | curl (MIT-style) | TLE downloads from CelesTrak | `find_package(CURL)`; on Linux and Windows a system or vcpkg package |
+| [libcurl](https://curl.se) | the system's (macOS SDK) | curl (MIT-style) | TLE downloads from CelesTrak, and the update check (`src/net/HttpGet`) | `find_package(CURL)`; on Linux and Windows a system or vcpkg package |
 | [SQLite](https://sqlite.org) | the system's (macOS SDK, 3.54 at build time) | Public domain | The journal | `find_package(SQLite3)`; on Linux and Windows a system or vcpkg package |
 | [libusb](https://libusb.info) | 1.0.30 (via [libusb-cmake](https://github.com/libusb/libusb-cmake) v1.0.30-0) | LGPL-2.1-or-later | USB access for librtlsdr | FetchContent, built static for our deployment target (Homebrew's static library targets the newest macOS only) |
 

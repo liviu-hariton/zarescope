@@ -23,6 +23,7 @@
 
 #include "app/PassAutomation.h"
 #include "app/Settings.h"
+#include "app/UpdateCheck.h"
 #include "decoders/adsb/AircraftStore.h"
 #include "device/Presets.h"
 #include "device/Receiver.h"
@@ -120,6 +121,8 @@ struct MainWindowServices {
     const Guide* guideEnglish = nullptr;
     const Guide* guideRomanian = nullptr;
     AboutInfo about;
+    // The update check (Settings › Updates, Zarescope › Check for Updates…).
+    app::UpdateChecker* updates = nullptr;
     // False for a run whose automatic recording was switched on by a test
     // flag (--simulate-pass): that switch isn't saved.
     bool saveAutoRecord = true;
@@ -173,6 +176,12 @@ private:
     // The tab strip; returns its height.
     float drawTabs(ImVec2 origin, float width);
     void drawStatusBar();
+    // The update check: this frame's state into the settings, and the
+    // download page in the current language.
+    void updateUpdates();
+    void openDownloadPage();
+    // Settings › Updates.
+    void drawUpdateSettings();
     void drawDevicePopup();
     void drawGainPopup();
     void drawFftPopup();
@@ -256,6 +265,10 @@ private:
     ImVec2 m_fftAnchor;
     bool m_confirmBiasTee = false;
     float m_traceSmoothing = 0.4F;
+
+    // The update check: this frame's state, and the last outcome dismissed.
+    app::UpdateStatus m_updates;
+    uint64_t m_dismissedUpdate = 0;
 
     // Banners the user dismissed, so they don't come back for the same event.
     std::string m_dismissedError;

@@ -292,6 +292,7 @@ void MainWindow::pullData() {
     }
     updateAutomation();
     updateJournal();
+    updateUpdates();
 
     // A newly opened source: the VFO starts on its centre frequency.
     const bool running = m_status.state == ReceiverState::Running;
@@ -394,9 +395,14 @@ void MainWindow::draw(ShellState& state) {
     drawPresetsPopup();
     drawSettingsPopup(state);
     ImGui::PopStyleVar(2);
-    if (const auto about = m_aboutView.draw(m_ui, m_services.about);
-        about.openWebsite && m_services.openUrl) {
+    AboutInfo about = m_services.about;
+    about.updateVersion = m_updates.available ? m_updates.latestVersion : std::string{};
+    const auto aboutActions = m_aboutView.draw(m_ui, about);
+    if (aboutActions.openWebsite && m_services.openUrl) {
         m_services.openUrl(kWebsiteUrl);
+    }
+    if (aboutActions.openDownload) {
+        openDownloadPage();
     }
 
     ImGui::End();
@@ -486,6 +492,11 @@ void MainWindow::runCommand(Command command, ShellState& state) {
     case Command::None:
     case Command::PresetFirst: break;
     case Command::About: m_aboutView.open(); break;
+    case Command::CheckUpdates:
+        if (m_services.updates != nullptr) {
+            m_services.updates->checkNow();
+        }
+        break;
     case Command::Settings: openSettingsFromMenu(); break;
     case Command::Quit:
         if (m_services.quit) {
@@ -601,6 +612,7 @@ void MainWindow::updateMenuState(const ShellState& state) {
     set(Command::LightTheme, true, state.variant == theme::ThemeVariant::Light);
     set(Command::ToggleAutoRecord, m_services.automation != nullptr, m_automation.enabled);
     set(Command::CheckSatDump, m_services.automation != nullptr);
+    set(Command::CheckUpdates, m_services.updates != nullptr && !m_updates.checking);
     for (size_t i = 0; i < m_services.presets.size(); ++i) {
         menu[static_cast<int>(Command::PresetFirst) + static_cast<int>(i)] = {control, false, {}};
     }
@@ -621,6 +633,32 @@ void MainWindow::saveSettingsIfChanged(const ShellState& state) {
     if (m_settings != m_savedSettings && m_services.saveSettings) {
         m_services.saveSettings(m_settings);
         m_savedSettings = m_settings;
+    }
+}
+
+// The update check: what it found is kept in the settings (when a check
+// last got through, and the newest version), so the next run knows it too.
+void MainWindow::updateUpdates() {
+    if (m_services.updates == nullptr) {
+        return;
+    }
+    m_updates = m_services.updates->status();
+    m_settings.latestVersion = m_updates.latestVersion;
+    if (m_updates.lastChecked) {
+        // Whole seconds: settings.json keeps no more, so a reloaded value
+        // compares equal and isn't written again.
+        m_settings.updateCheckedUtc =
+            std::chrono::floor<std::chrono::seconds>(*m_updates.lastChecked);
+    }
+}
+
+// The download page, in the app's language. Its address is fixed in the app
+// (UpdateCheck.h): nothing the server answers can change it.
+void MainWindow::openDownloadPage() {
+    if (m_services.openUrl) {
+        m_services.openUrl(std::string(m_ui.language() == Language::Romanian
+                                           ? app::kDownloadPageRomanian
+                                           : app::kDownloadPageEnglish));
     }
 }
 
@@ -946,13 +984,56 @@ float MainWindow::drawBanner(float top) {
         }
         return m_ui.size("recordBanner");
     }
+    // A check the user asked for: while it runs, then what it found, until
+    // dismissed. Automatic checks never show here; they only light the
+    // status bar's chip.
+    if (m_updates.checkingManual) {
+        m_ui.banner("##updateChecking", min, width, Status::Neutral, Icon::Dot, {},
+                    m_ui.tr(StringId::UpdatesChecking), {});
+        return m_ui.size("recordBanner");
+    }
+    if (m_updates.manualSerial > m_dismissedUpdate) {
+        const std::string current = m_services.about.version;
+        bool dismiss = false;
+        bool clicked = false;
+        switch (m_updates.manualOutcome) {
+        case app::UpdateOutcome::Available:
+            clicked = m_ui.banner(
+                "##updateOutcome", min, width, Status::Neutral, Icon::Dot, {},
+                m_ui.trf(StringId::UpdatesAvailable, m_updates.latestVersion, current),
+                m_ui.tr(StringId::UpdatesDownload), -1.0F, m_ui.tr(StringId::Dismiss), &dismiss);
+            if (clicked) {
+                openDownloadPage();
+            }
+            break;
+        case app::UpdateOutcome::UpToDate:
+            clicked = m_ui.banner("##updateOutcome", min, width, Status::Success, Icon::Check, {},
+                                  m_ui.trf(StringId::UpdatesUpToDate, current),
+                                  m_ui.tr(StringId::Dismiss));
+            break;
+        case app::UpdateOutcome::Failed:
+        case app::UpdateOutcome::None:
+            clicked = m_ui.banner("##updateOutcome", min, width, Status::Warning, Icon::Alert, {},
+                                  m_ui.trf(StringId::UpdatesFailed, m_updates.manualError),
+                                  m_ui.tr(StringId::Dismiss));
+            break;
+        }
+        if (clicked || dismiss) {
+            m_dismissedUpdate = m_updates.manualSerial;
+        }
+        return m_ui.size("recordBanner");
+    }
     return 0.0F;
 }
 
 // --- Body ---------------------------------------------------------------------------
 
 void MainWindow::drawBody() {
-    const float height = ImGui::GetContentRegionAvail().y - m_ui.size("statusBar");
+    // What is left above the status bar, less the item spacing ImGui puts
+    // between the two areas (without it the status bar's bottom 8 px fell
+    // below the window's edge).
+    const float height =
+        ImGui::GetContentRegionAvail().y - m_ui.size("statusBar") - ImGui::GetStyle().ItemSpacing.y;
     beginArea("##body", height, m_ui.color("bg/base"));
     const ImVec2 origin = ImGui::GetWindowPos();
     const ImVec2 size = ImGui::GetWindowSize();
@@ -1248,6 +1329,32 @@ void MainWindow::drawStatusBar() {
          labelGap;
     x += m_ui.drawTextCentered(drawList, role, x, origin.y, height, value, m_services.versionText) +
          pairGap;
+    // A newer version: a small pill after the version, in the accent, that
+    // opens the download page. It says so in words, so the colour is never
+    // the only signal (DESIGN.md §2).
+    if (m_updates.available && !m_updates.latestVersion.empty()) {
+        const std::string text = m_ui.trf(StringId::StatusUpdate, m_updates.latestVersion);
+        const float padX = m_ui.spacing("8");
+        const float inset = m_ui.spacing("4");
+        const ImVec2 min(x, origin.y + inset);
+        const ImVec2 size(m_ui.textSize(role, text).x + 2.0F * padX, height - 2.0F * inset);
+        ImGui::SetCursorScreenPos(min);
+        if (ImGui::InvisibleButton("##updateChip", size)) {
+            openDownloadPage();
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
+        UiKit::tooltip(m_ui.tr(StringId::TipStatusUpdate));
+        const ImVec2 max(min.x + size.x, min.y + size.y);
+        drawList.AddRectFilled(min, max, m_ui.color(hovered ? "bg/hover" : "accent/soft"),
+                               m_ui.radius("pill"));
+        drawList.AddRect(min, max, m_ui.color("accent"), m_ui.radius("pill"), m_ui.border());
+        m_ui.drawTextCentered(drawList, role, x + padX, origin.y, height, m_ui.color("accent"),
+                              text);
+        x += size.x + pairGap;
+    }
     if (m_status.state == ReceiverState::Running) {
         if (!m_status.isDevice) {
             x += m_ui.drawTextCentered(drawList, role, x, origin.y, height, label,
@@ -1832,7 +1939,56 @@ void MainWindow::drawSettingsPopup(ShellState& state) {
     if (ImGui::RadioButton("Română", state.language == Language::Romanian)) {
         state.language = Language::Romanian;
     }
+    if (m_services.updates != nullptr) {
+        ImGui::Separator();
+        drawUpdateSettings();
+    }
     ImGui::EndPopup();
+}
+
+// Settings › Updates: the daily check (off by default), what it sends, a
+// check on demand, and the state: checking, a newer version with its
+// download button, or when the last check got through.
+void MainWindow::drawUpdateSettings() {
+    app::UpdateChecker& updates = *m_services.updates;
+    auto secondaryText = [&](std::string_view text, std::string_view token = "text/secondary") {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPopoverWidth);
+        ImGui::PushStyleColor(ImGuiCol_Text, m_ui.colorVec(token));
+        ImGui::TextUnformatted(text.data(), text.data() + text.size());
+        ImGui::PopStyleColor();
+        ImGui::PopTextWrapPos();
+    };
+    ImGui::TextUnformatted(cstr(m_ui.tr(StringId::UpdatesLabel)).c_str());
+    if (ImGui::Checkbox(cstr(m_ui.tr(StringId::UpdatesAutomatic)).c_str(),
+                        &m_settings.checkUpdates)) {
+        updates.setAutomatic(m_settings.checkUpdates);
+    }
+    secondaryText(m_ui.tr(StringId::UpdatesPrivacy));
+
+    // The state first, then what can be done about it.
+    if (m_updates.available) {
+        secondaryText(
+            m_ui.trf(StringId::UpdatesAvailable, m_updates.latestVersion, m_services.about.version),
+            "accent");
+    } else if (!m_updates.checking) {
+        secondaryText(m_updates.lastChecked ? m_ui.trf(StringId::UpdatesLastChecked,
+                                                       formatLocalDateTime(*m_updates.lastChecked))
+                                            : std::string(m_ui.tr(StringId::UpdatesNeverChecked)));
+    }
+    if (m_updates.available) {
+        if (ImGui::Button(cstr(m_ui.tr(StringId::UpdatesDownload)).c_str())) {
+            openDownloadPage();
+        }
+        ImGui::SameLine();
+    }
+    ImGui::BeginDisabled(m_updates.checking);
+    const std::string checkLabel =
+        cstr(m_ui.tr(m_updates.checking ? StringId::UpdatesChecking : StringId::UpdatesCheckNow)) +
+        "##checkUpdates";
+    if (ImGui::Button(checkLabel.c_str())) {
+        updates.checkNow();
+    }
+    ImGui::EndDisabled();
 }
 
 }  // namespace zarescope::ui
